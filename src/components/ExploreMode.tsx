@@ -1,8 +1,7 @@
 import { Component, type ReactNode } from "react";
 import { type ClaudeSession } from "../store/sessionStore";
 import { ExplorerPane } from "./explore/ExplorerPane";
-import { EditorTabs } from "./editor/EditorTabs";
-import { EditorHost } from "./editor/EditorHost";
+import { EditorSplitHost } from "./editor/EditorSplitHost";
 
 class ExploreErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   state = { error: null };
@@ -15,6 +14,12 @@ class ExploreErrorBoundary extends Component<{ children: ReactNode }, { error: s
 
   componentDidCatch(error: unknown) {
     console.error("[explore-mode] render crash", error);
+    window.dispatchEvent(new CustomEvent("explore-boundary-error", {
+      detail: {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack ?? null : null,
+      },
+    }));
   }
 
   render() {
@@ -74,7 +79,7 @@ export function ExploreSidebar({
   onRefreshDiff,
 }: {
   session: ClaudeSession | null;
-  onRefreshDiff: (sessionId?: string | null) => void;
+  onRefreshDiff: (sessionId?: string | null, options?: { reloadExplorer?: boolean }) => void;
 }) {
   return (
     <ExploreErrorBoundary>
@@ -96,7 +101,7 @@ export function ExploreEditor({
   onRefreshDiff,
 }: {
   session: ClaudeSession | null;
-  onRefreshDiff: (sessionId?: string | null) => void;
+  onRefreshDiff: (sessionId?: string | null, options?: { reloadExplorer?: boolean }) => void;
 }) {
   return (
     <ExploreErrorBoundary>
@@ -108,10 +113,7 @@ export function ExploreEditor({
         flexDirection: "column",
         background: "transparent",
       }}>
-        <EditorTabs session={session} />
-        <div style={{ flex: 1, minHeight: 0 }}>
-          <EditorHost session={session} onRefreshDiff={onRefreshDiff} />
-        </div>
+        <EditorSplitHost session={session} onRefreshDiff={onRefreshDiff} />
       </div>
     </ExploreErrorBoundary>
   );

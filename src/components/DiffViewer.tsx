@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, FileCode2, FilePlus2, FileX2, Minus, ArrowUp, ArrowDown } from "lucide-react";
+import { ChevronDown, ChevronRight, FileCode2, FilePlus2, FileX2, Minus, Plus } from "lucide-react";
 import { DiffFile, DiffLine } from "../store/sessionStore";
 import { type ScmActionMode } from "../store/scmStore";
 import { WorkbenchTooltip } from "./ui/WorkbenchTooltip";
@@ -131,6 +131,7 @@ function DiffFileRow({
   onUnstageHunk,
   onDiscardHunk,
   busy,
+  contentMaxHeight,
 }: {
   file: DiffFile;
   fileMode?: ScmActionMode | null;
@@ -138,9 +139,11 @@ function DiffFileRow({
   onUnstageHunk?: (path: string, hunkIndex: number) => void;
   onDiscardHunk?: (path: string, hunkIndex: number) => void;
   busy?: boolean;
+  contentMaxHeight?: number | string;
 }) {
   const [isOpen, setIsOpen] = useState(true);
   const isBinary = !!file.binary;
+  const useInnerScroll = contentMaxHeight !== "none";
 
   return (
     <div style={{ borderBottom: "1px solid var(--ci-toolbar-border)", background: "transparent" }}>
@@ -176,7 +179,7 @@ function DiffFileRow({
       </button>
 
       {isOpen && (
-        <div style={{ background: "var(--ci-code-bg)", borderTop: "1px solid var(--ci-toolbar-border)", overflowY: "visible", overflowX: "auto" }}>
+        <div style={{ background: "var(--ci-code-bg)", borderTop: "1px solid var(--ci-toolbar-border)", maxHeight: contentMaxHeight, overflow: useInnerScroll ? "auto" : "visible" }}>
           {isBinary ? (
             <div style={{ padding: "14px 16px", fontSize: 11, color: "var(--ci-text-dim)" }}>
               二进制文件暂不支持预览
@@ -202,9 +205,9 @@ function DiffFileRow({
                 }}>
                   <span>{hunk.header}</span>
                   <div style={{ marginLeft: "auto", display: "flex", gap: 2 }}>
-                    {fileMode === "unstaged" && onStageHunk && <HunkActionButton label="Stage hunk" icon={<ArrowUp size={12} strokeWidth={1.8} />} onClick={() => onStageHunk(file.path, hi)} disabled={busy} />}
+                    {fileMode === "unstaged" && onStageHunk && <HunkActionButton label="Stage hunk" icon={<Plus size={12} strokeWidth={1.8} />} onClick={() => onStageHunk(file.path, hi)} disabled={busy} />}
                     {fileMode === "unstaged" && onDiscardHunk && <HunkActionButton label="Discard hunk" icon={<Minus size={12} strokeWidth={1.8} />} onClick={() => onDiscardHunk(file.path, hi)} disabled={busy} />}
-                    {fileMode === "staged" && onUnstageHunk && <HunkActionButton label="Unstage hunk" icon={<ArrowDown size={12} strokeWidth={1.8} />} onClick={() => onUnstageHunk(file.path, hi)} disabled={busy} />}
+                    {fileMode === "staged" && onUnstageHunk && <HunkActionButton label="Unstage hunk" icon={<Minus size={12} strokeWidth={1.8} />} onClick={() => onUnstageHunk(file.path, hi)} disabled={busy} />}
                   </div>
                 </div>
                 {hunk.lines.map((line, li) => (
@@ -226,6 +229,7 @@ export function DiffViewer({
   onUnstageHunk,
   onDiscardHunk,
   busy = false,
+  contentMaxHeight = 420,
 }: {
   files: DiffFile[];
   fileMode?: ScmActionMode | null;
@@ -233,6 +237,7 @@ export function DiffViewer({
   onUnstageHunk?: (path: string, hunkIndex: number) => void;
   onDiscardHunk?: (path: string, hunkIndex: number) => void;
   busy?: boolean;
+  contentMaxHeight?: number | string;
 }) {
   if (files.length === 0) {
     return (
@@ -272,6 +277,7 @@ export function DiffViewer({
           onUnstageHunk={onUnstageHunk}
           onDiscardHunk={onDiscardHunk}
           busy={busy}
+          contentMaxHeight={contentMaxHeight}
         />
       ))}
     </div>
