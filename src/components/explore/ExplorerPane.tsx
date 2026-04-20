@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -72,6 +72,8 @@ export function ExplorerPane({
   const touchedPathSet = useMemo(() => new Set(touchedPaths), [touchedPaths]);
   const treeScrollRef = useRef<HTMLDivElement | null>(null);
   const rowActiveBackground = theme === "dark" ? "rgba(255,255,255,0.05)" : "rgba(0,122,255,0.10)";
+  const rowHoverBackground = "var(--ci-list-hover-bg)";
+  const [hoveredNodeKey, setHoveredNodeKey] = useState<string | null>(null);
   void rowIndexByPath;
   void pathByRowIndex;
   void visiblePathSet;
@@ -129,7 +131,7 @@ export function ExplorerPane({
   }, [selectedPath, selectedRevealMode, rowIndexByPath, visiblePathSet]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, background: "var(--ci-toolbar-bg)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, background: "transparent" }}>
       <div style={{
         display: "flex",
         alignItems: "center",
@@ -206,6 +208,7 @@ export function ExplorerPane({
         ) : visibleRows.map((node) => {
           if (node.type === "dir") {
             const isOpen = expandedDirs.includes(node.path);
+            const isHovered = hoveredNodeKey === node.key;
             const isTouched = touchedPathSet.has(node.path);
             return (
               <div key={node.key}>
@@ -216,11 +219,14 @@ export function ExplorerPane({
                       void loadDirectory(session.id, node.path);
                     }
                   }}
+                  onMouseEnter={() => setHoveredNodeKey(node.key)}
+                  onMouseLeave={() => setHoveredNodeKey((current) => (current === node.key ? null : current))}
                   style={{
                     ...rowBaseStyle,
                     padding: "0 10px",
                     paddingLeft: 8 + node.depth * 14,
-                    color: "var(--ci-text-muted)",
+                    background: isHovered ? rowHoverBackground : "transparent",
+                    color: isHovered ? "var(--ci-text)" : "var(--ci-text-muted)",
                     cursor: "pointer",
                     outline: isTouched ? "1px solid var(--ci-accent-bdr)" : "none",
                     outlineOffset: -1,
@@ -245,6 +251,7 @@ export function ExplorerPane({
           }
 
           const isSelected = selectedPath === node.path;
+          const isHovered = hoveredNodeKey === node.key;
           const buffer = buffersByTabId[`code:${session.id}:${node.path}`];
           const kind = statusByPath.get(node.path) ?? null;
           const isTouched = touchedPathSet.has(node.path);
@@ -255,12 +262,14 @@ export function ExplorerPane({
                 openFile(session.id, node.path, true, true, "explorer");
               }}
               onDoubleClick={() => openFile(session.id, node.path, false, true, "explorer")}
+              onMouseEnter={() => setHoveredNodeKey(node.key)}
+              onMouseLeave={() => setHoveredNodeKey((current) => (current === node.key ? null : current))}
               style={{
                 ...rowBaseStyle,
                 padding: "0 10px",
                 paddingLeft: 24 + node.depth * 14,
-                background: isSelected ? rowActiveBackground : "transparent",
-                color: isSelected ? "var(--ci-text)" : "var(--ci-text-muted)",
+                background: isSelected ? rowActiveBackground : isHovered ? rowHoverBackground : "transparent",
+                color: isSelected || isHovered ? "var(--ci-text)" : "var(--ci-text-muted)",
                 cursor: "pointer",
                 borderLeft: isSelected ? "1px solid var(--ci-accent)" : "1px solid transparent",
                 outline: isTouched ? "1px solid var(--ci-accent-bdr)" : "none",

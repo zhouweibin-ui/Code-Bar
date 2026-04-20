@@ -52,7 +52,7 @@ export type ExplorerVisibleRow = {
 export interface ExplorerViewModel {
   expandedDirs: string[];
   selectedPath: string | null;
-  selectedRevealMode: false | true | "force" | "focusNoScroll";
+  selectedRevealMode: ExplorerNodeState["selectModeBySession"][string];
   rootLoading: boolean;
   rootError: string | null;
   hasRootSnapshot: boolean;
@@ -235,7 +235,7 @@ function patchSessionGraphDelete(
     }),
   );
   const nextChildPathsBySessionDir = Object.fromEntries(
-    Object.entries(state.childPathsBySessionDir).filter(([key, childPaths]) => {
+    Object.entries(state.childPathsBySessionDir).filter(([key]) => {
       const sessionPrefix = `${sessionId}:`;
       if (!key.startsWith(sessionPrefix)) return true;
       const dir = key.slice(sessionPrefix.length);

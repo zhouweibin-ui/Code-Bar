@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { loadFile, saveTab } from "../../services/editorCommands";
 import { useEditorBufferStore, type EditorBufferState } from "../../store/editorBufferStore";
 import { useEditorStore } from "../../store/editorStore";
-import { useExplorerStore } from "../../store/explorerStore";
 import { useScmStore } from "../../store/scmStore";
 import { type ClaudeSession, type DiffFile } from "../../store/sessionStore";
 import { CodeEditorSurface } from "./CodeEditorSurface";
@@ -154,7 +153,7 @@ export function EditorHost({
         gap: 12,
         padding: "8px 14px",
         borderBottom: "1px solid var(--ci-toolbar-border)",
-        background: "var(--ci-toolbar-bg)",
+        background: "transparent",
       }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 12, color: "var(--ci-text)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -172,16 +171,24 @@ export function EditorHost({
             });
           }}
           disabled={!activeBuffer.dirty || activeBuffer.saving}
+          onMouseEnter={e => {
+            if (!activeBuffer.dirty || activeBuffer.saving) return;
+            e.currentTarget.style.opacity = "0.8";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.opacity = activeBuffer.dirty ? "1" : "0.7";
+          }}
           style={{
-            background: activeBuffer.dirty ? "var(--ci-accent-bg)" : "var(--ci-btn-ghost-bg)",
-            border: `1px solid ${activeBuffer.dirty ? "var(--ci-accent-bdr)" : "var(--ci-toolbar-border)"}`,
+            background: "none",
+            border: "none",
             color: activeBuffer.dirty ? "var(--ci-accent)" : "var(--ci-text-dim)",
             cursor: !activeBuffer.dirty || activeBuffer.saving ? "default" : "pointer",
-            borderRadius: 8,
-            padding: "6px 10px",
+            padding: "4px 2px",
             fontSize: 11,
             fontWeight: 600,
             flexShrink: 0,
+            opacity: activeBuffer.dirty ? 1 : 0.7,
+            transition: "opacity 0.12s",
           }}
         >
           {activeBuffer.saving ? "保存中…" : "保存"}

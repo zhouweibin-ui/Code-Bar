@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { openDiff, revealExplorerPath } from "./editorCommands";
 import { useEditorStore } from "../store/editorStore";
-import { useExplorerStore } from "../store/explorerStore";
 import { type ScmActionMode, type ScmEntryGroup, useScmStore } from "../store/scmStore";
 import { useSessionStore } from "../store/sessionStore";
 import { useWorkbenchStore } from "../store/workbenchStore";

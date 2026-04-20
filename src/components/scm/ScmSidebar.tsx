@@ -147,12 +147,12 @@ function GroupSection({
     <>
       {files.map((file) => {
         const isSelected = selectedPath === file.path;
-        const showActions = isSelected || hoveredPath === file.path;
+        const isHovered = hoveredPath === file.path;
         return (
           <div
             key={`${group}:${file.path}`}
             onMouseEnter={() => setHoveredPath(file.path)}
-            onMouseLeave={() => setHoveredPath((current) => current === file.path ? null : current)}
+            onMouseLeave={() => setHoveredPath((current) => (current === file.path ? null : current))}
             style={{
               width: "100%",
               display: "flex",
@@ -160,8 +160,8 @@ function GroupSection({
               gap: 8,
               minHeight: 22,
               padding: "0 8px 0 24px",
-              background: isSelected ? "var(--ci-accent-bg)" : "transparent",
-              color: isSelected ? "var(--ci-text)" : "var(--ci-text-muted)",
+              background: isSelected ? "var(--ci-list-active-bg)" : isHovered ? "var(--ci-list-hover-bg)" : "transparent",
+              color: isSelected || isHovered ? "var(--ci-text)" : "var(--ci-text-muted)",
               borderLeft: isSelected ? "1px solid var(--ci-accent)" : "1px solid transparent",
             }}
           >
@@ -189,7 +189,7 @@ function GroupSection({
                 {file.path}
               </span>
             </button>
-            <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, opacity: showActions ? 1 : 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, opacity: isSelected || isHovered ? 1 : 0, pointerEvents: isSelected || isHovered ? "auto" : "none" }}>
               {(group === "unstaged" || group === "untracked") && (
                 <ActionButton label="Stage" icon={<Plus size={12} strokeWidth={1.8} />} onClick={() => stageScmFile(sessionId, file.path)} disabled={busy} />
               )}
@@ -251,7 +251,7 @@ export function ScmSidebar({ session }: { session: ClaudeSession | null }) {
     : snapshot.map(mapDiffFileToStatusEntry);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, background: "var(--ci-toolbar-bg)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, background: "transparent" }}>
       <div style={{
         display: "flex",
         alignItems: "center",
@@ -314,18 +314,27 @@ export function ScmSidebar({ session }: { session: ClaudeSession | null }) {
         <button
           onClick={() => void commitScm(session.id)}
           disabled={busy || commitMessage.trim().length === 0}
+          onMouseEnter={e => {
+            if (busy || commitMessage.trim().length === 0) return;
+            e.currentTarget.style.opacity = "0.8";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.opacity = busy || commitMessage.trim().length === 0 ? "0.7" : "1";
+          }}
           style={{
             alignSelf: "flex-start",
-            background: busy || commitMessage.trim().length === 0 ? "var(--ci-btn-ghost-bg)" : "var(--ci-accent-bg)",
-            border: `1px solid ${busy || commitMessage.trim().length === 0 ? "var(--ci-toolbar-border)" : "var(--ci-accent-bdr)"}`,
+            background: "none",
+            border: "none",
             color: busy || commitMessage.trim().length === 0 ? "var(--ci-text-dim)" : "var(--ci-accent)",
-            borderRadius: 2,
-            padding: "4px 8px",
+            padding: "4px 2px",
             fontSize: 11,
+            fontWeight: 600,
             cursor: busy || commitMessage.trim().length === 0 ? "default" : "pointer",
             display: "flex",
             alignItems: "center",
             gap: 6,
+            opacity: busy || commitMessage.trim().length === 0 ? 0.7 : 1,
+            transition: "opacity 0.12s",
           }}
         >
           <Plus size={12} strokeWidth={1.8} />
