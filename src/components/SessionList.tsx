@@ -125,17 +125,6 @@ function SessionCard({
     alignItems: "center",
     justifyContent: "center",
   } as const;
-  const textButtonStyle = {
-    background: "var(--ci-btn-ghost-bg)",
-    border: "1px solid transparent",
-    color: "var(--ci-text-dim)",
-    cursor: "pointer",
-    padding: "3px 6px",
-    borderRadius: 5,
-    flexShrink: 0,
-    fontSize: 10,
-  } as const;
-
   return (
     <motion.div
       layout
@@ -259,21 +248,48 @@ function SessionCard({
         >
           <button
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            onMouseEnter={e => {
+              e.currentTarget.style.opacity = "0.8";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.opacity = "1";
+            }}
             style={{
-              ...textButtonStyle,
-              background: "var(--ci-deleted-bg)",
-              border: "1px solid rgba(255,59,48,0.28)",
+              background: "none",
+              border: "none",
+              padding: "3px 2px",
               color: "var(--ci-red)",
+              fontSize: 10,
               fontWeight: 600,
+              cursor: "pointer",
+              transition: "opacity 0.12s",
             }}
           >
             确认删除
           </button>
           <button
-            onClick={(e) => { e.stopPropagation(); onClick(); }}
+            onClick={(e) => { e.stopPropagation(); setHovered(false); onClick(); }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
             style={{
-              ...textButtonStyle,
-              border: "1px solid var(--ci-border)",
+              background: "none",
+              border: "none",
+              padding: "3px 2px",
+              color: "var(--ci-text-muted)",
+              fontSize: 10,
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "color 0.12s, opacity 0.12s",
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = "var(--ci-text)";
+              e.currentTarget.style.opacity = "0.8";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = "var(--ci-text-muted)";
+              e.currentTarget.style.opacity = "1";
             }}
           >
             取消
@@ -296,10 +312,24 @@ function SessionCard({
                 e.preventDefault();
                 e.stopPropagation();
               }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = "var(--ci-text)";
+                e.currentTarget.style.opacity = "0.8";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = isSuspended ? "#6B7280" : "var(--ci-text-dim)";
+                e.currentTarget.style.opacity = "1";
+              }}
               title={isWaiting ? "挂起" : "恢复为需要操作"}
               style={{
-                ...textButtonStyle,
+                background: "none",
+                border: "none",
+                padding: "3px 2px",
                 color: isSuspended ? "#6B7280" : "var(--ci-text-dim)",
+                fontSize: 10,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "color 0.12s, opacity 0.12s",
               }}
             >
               {isWaiting ? "挂起" : "恢复"}

@@ -297,18 +297,27 @@ export function ScmSidebar({ session }: { session: ClaudeSession | null }) {
         <button
           onClick={() => void commitScm(session.id)}
           disabled={busy || commitMessage.trim().length === 0}
+          onMouseEnter={e => {
+            if (busy || commitMessage.trim().length === 0) return;
+            e.currentTarget.style.opacity = "0.8";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.opacity = busy || commitMessage.trim().length === 0 ? "0.7" : "1";
+          }}
           style={{
             alignSelf: "flex-start",
-            background: busy || commitMessage.trim().length === 0 ? "var(--ci-btn-ghost-bg)" : "var(--ci-accent-bg)",
-            border: `1px solid ${busy || commitMessage.trim().length === 0 ? "var(--ci-toolbar-border)" : "var(--ci-accent-bdr)"}`,
+            background: "none",
+            border: "none",
             color: busy || commitMessage.trim().length === 0 ? "var(--ci-text-dim)" : "var(--ci-accent)",
-            borderRadius: 2,
-            padding: "4px 8px",
+            padding: "4px 2px",
             fontSize: 11,
+            fontWeight: 600,
             cursor: busy || commitMessage.trim().length === 0 ? "default" : "pointer",
             display: "flex",
             alignItems: "center",
             gap: 6,
+            opacity: busy || commitMessage.trim().length === 0 ? 0.7 : 1,
+            transition: "opacity 0.12s",
           }}
         >
           <Plus size={12} strokeWidth={1.8} />

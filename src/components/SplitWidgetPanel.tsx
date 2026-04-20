@@ -723,16 +723,6 @@ export function SplitWidgetPanel() {
         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
           <button
             onClick={() => {
-              if (settings.splitWidgetCanvas.filledSnapshot && settings.splitWidgetCanvas.filledSnapshot.length > 0) {
-                patchSettings({
-                  splitWidgetCanvas: {
-                    ...settings.splitWidgetCanvas,
-                    items: settings.splitWidgetCanvas.filledSnapshot,
-                    filledSnapshot: null,
-                  },
-                });
-                return;
-              }
               const expanded = expandLayoutToFill(repairedWidgets, maxCols, maxRows);
               const repaired = repairLayout(expanded, maxCols, maxRows).map((item) => insetRect(item, maxCols, maxRows));
               patchSettings({
@@ -746,28 +736,46 @@ export function SplitWidgetPanel() {
                 },
               });
             }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = "var(--ci-text)";
+              e.currentTarget.style.opacity = "0.8";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = "var(--ci-text-muted)";
+              e.currentTarget.style.opacity = "1";
+            }}
             style={{
-              background: "var(--ci-btn-ghost-bg)",
-              border: "1px solid var(--ci-toolbar-border)",
+              background: "none",
+              border: "none",
               color: "var(--ci-text-muted)",
               cursor: "pointer",
               fontSize: 11,
-              padding: "4px 8px",
-              borderRadius: 7,
+              fontWeight: 600,
+              padding: "4px 2px",
+              transition: "color 0.12s, opacity 0.12s",
             }}
           >
-            {settings.splitWidgetCanvas.filledSnapshot ? "还原" : "铺满"}
+            铺满
           </button>
           <button
             onClick={() => patchSettings({ splitWidgetPanelCollapsed: true })}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = "var(--ci-text)";
+              e.currentTarget.style.opacity = "0.8";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = "var(--ci-text-muted)";
+              e.currentTarget.style.opacity = "1";
+            }}
             style={{
-              background: "var(--ci-btn-ghost-bg)",
-              border: "1px solid var(--ci-toolbar-border)",
+              background: "none",
+              border: "none",
               color: "var(--ci-text-muted)",
               cursor: "pointer",
               fontSize: 11,
-              padding: "4px 8px",
-              borderRadius: 7,
+              fontWeight: 600,
+              padding: "4px 2px",
+              transition: "color 0.12s, opacity 0.12s",
             }}
           >
             收起

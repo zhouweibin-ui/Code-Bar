@@ -224,10 +224,7 @@ function SessionPanel({ sessionId, isOpen, onClose, presentation, showHeader }: 
   const titlebarBackground = isGlass ? "var(--ci-toolbar-bg)" : "var(--ci-pty-titlebar-bg)";
   const titlebarBorder = isGlass ? "none" : "1px solid var(--ci-pty-titlebar-bdr)";
   const titlebarText = isGlass ? "var(--ci-text)" : "var(--ci-pty-title-color)";
-  const actionButtonBackground = isGlass ? "var(--ci-pill-bg)" : "var(--ci-pty-btn-bg)";
-  const actionButtonBorder = isGlass ? "1px solid var(--ci-pill-border)" : "1px solid var(--ci-pty-btn-border)";
   const actionButtonText = isGlass ? "var(--ci-text-muted)" : "var(--ci-pty-btn-text)";
-  const actionButtonHoverBackground = isGlass ? "var(--ci-surface-hi)" : "var(--ci-pty-btn-hover-bg)";
   const actionButtonHoverText = isGlass ? "var(--ci-text)" : "var(--ci-pty-btn-hover-text)";
   const runnerChipBackground = isGlass ? "var(--ci-accent-bg)" : "var(--ci-pty-runner-bg)";
   const runnerChipBorder = isGlass ? "1px solid var(--ci-accent-bdr)" : "1px solid var(--ci-pty-runner-border)";
@@ -308,10 +305,22 @@ function SessionPanel({ sessionId, isOpen, onClose, presentation, showHeader }: 
               onClick={() => { setInstalling(false); recheckCli(); }}
               onMouseDown={(e) => e.stopPropagation()}
               style={{
-                background: actionButtonBackground,
-                border: actionButtonBorder,
-                borderRadius: 6, padding: "2px 8px",
-                color: actionButtonText, fontSize: 11, cursor: "pointer",
+                background: "none",
+                border: "none",
+                padding: "2px 2px",
+                color: actionButtonText,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "color 0.12s, opacity 0.12s",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = actionButtonHoverText;
+                e.currentTarget.style.opacity = "0.8";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = actionButtonText;
+                e.currentTarget.style.opacity = "1";
               }}
             >
               取消
@@ -324,19 +333,22 @@ function SessionPanel({ sessionId, isOpen, onClose, presentation, showHeader }: 
               onClick={onClose}
               onMouseDown={(e) => e.stopPropagation()}
               style={{
-                background: actionButtonBackground,
-                border: actionButtonBorder,
-                borderRadius: 6, padding: "2px 8px",
-                color: actionButtonText, fontSize: 11, cursor: "pointer",
-                transition: "background 0.15s, color 0.15s",
+                background: "none",
+                border: "none",
+                padding: "2px 2px",
+                color: actionButtonText,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "color 0.12s, opacity 0.12s",
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.background = actionButtonHoverBackground;
                 e.currentTarget.style.color = actionButtonHoverText;
+                e.currentTarget.style.opacity = "0.8";
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = actionButtonBackground;
                 e.currentTarget.style.color = actionButtonText;
+                e.currentTarget.style.opacity = "1";
               }}
             >
               收起

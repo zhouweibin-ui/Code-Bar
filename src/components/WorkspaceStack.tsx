@@ -116,26 +116,27 @@ function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
             <button onClick={handlePick} disabled={picking}
               style={{
                 flexShrink: 0,
-                background: "transparent",
-                border: "1px solid var(--ci-border)",
-                borderRadius: 8, padding: "0 10px",
+                background: "none",
+                border: "none",
+                padding: "0 2px",
                 color: picking ? "var(--ci-text-dim)" : "var(--ci-text-muted)",
-                cursor: picking ? "wait" : "pointer", fontSize: 15,
-                display: "flex", alignItems: "center",
-                transition: "background 0.12s, border-color 0.12s, color 0.12s",
+                cursor: picking ? "wait" : "pointer",
+                fontSize: 11.5,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                transition: "color 0.12s, opacity 0.12s",
               }}
               onMouseEnter={e => {
                 if (picking) return;
-                e.currentTarget.style.background = "var(--ci-btn-ghost-bg)";
-                e.currentTarget.style.borderColor = "var(--ci-toolbar-border)";
                 e.currentTarget.style.color = "var(--ci-text)";
+                e.currentTarget.style.opacity = "0.8";
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "var(--ci-border)";
                 e.currentTarget.style.color = picking ? "var(--ci-text-dim)" : "var(--ci-text-muted)";
+                e.currentTarget.style.opacity = "1";
               }}
-            >{picking ? "…" : "📂"}</button>
+            >{picking ? "选择中" : "选择目录"}</button>
           </div>
           {error && <div style={{ marginTop: 4, fontSize: 11, color: "var(--ci-red)" }}>{error}</div>}
         </div>
@@ -164,40 +165,37 @@ function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
         <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 2 }}>
           <button onClick={onDone}
             style={{
-              background: "transparent",
-              border: "1px solid var(--ci-border)",
-              borderRadius: 7, padding: "5px 12px",
+              background: "none",
+              border: "none",
+              padding: "5px 2px",
               color: "var(--ci-text-muted)", fontSize: 11.5, cursor: "pointer",
-              fontWeight: 500,
-              transition: "background 0.12s, border-color 0.12s, color 0.12s",
+              fontWeight: 600,
+              transition: "color 0.12s, opacity 0.12s",
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.background = "var(--ci-btn-ghost-bg)";
-              e.currentTarget.style.borderColor = "var(--ci-toolbar-border)";
               e.currentTarget.style.color = "var(--ci-text)";
+              e.currentTarget.style.opacity = "0.8";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.borderColor = "var(--ci-border)";
               e.currentTarget.style.color = "var(--ci-text-muted)";
+              e.currentTarget.style.opacity = "1";
             }}
           >取消</button>
           <button onClick={handleCreate}
             style={{
-              background: "var(--ci-accent-bg)",
-              border: "1px solid var(--ci-accent-bdr)",
-              borderRadius: 7, padding: "5px 14px",
+              background: "none",
+              border: "none",
+              padding: "5px 2px",
               color: "var(--ci-accent)", fontSize: 11.5, fontWeight: 600, cursor: "pointer",
-              transition: "background 0.12s, border-color 0.12s, color 0.12s",
+              transition: "color 0.12s, opacity 0.12s",
             }}
             onMouseEnter={e => {
-              if (isGlass) return;
-              e.currentTarget.style.background = "var(--ci-accent)";
-              e.currentTarget.style.color = "#fff";
+              e.currentTarget.style.color = "var(--ci-accent)";
+              e.currentTarget.style.opacity = "0.8";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = "var(--ci-accent-bg)";
               e.currentTarget.style.color = "var(--ci-accent)";
+              e.currentTarget.style.opacity = "1";
             }}
           >创建</button>
         </div>
@@ -464,7 +462,6 @@ function WorkspaceStackCollapsed({
 export function WorkspaceStack() {
   const { workspaces, activeWorkspaceId, bringToFront, removeWorkspace } = useWorkspaceStore();
   const { removeSessionsByWorkspace } = useSessionStore();
-  const isGlass = useSettingsStore((s) => isGlassTheme(s.settings.theme));
   const sorted = useWorkspacesSorted();
 
   const [expanded, setExpanded] = useState(false);
@@ -524,27 +521,23 @@ export function WorkspaceStack() {
               onClick={() => setShowForm(true)}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "10px 0",
-                background: "var(--ci-surface)",
-                border: `1px dashed var(--ci-border-med)`,
-                borderRadius: 8, cursor: "pointer",
-                color: "var(--ci-text-muted)", fontSize: 11.5,
-                transition: "background 0.15s, border-color 0.15s",
+                padding: "8px 0",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "var(--ci-text-muted)", fontSize: 11.5, fontWeight: 600,
+                transition: "color 0.12s, opacity 0.12s",
               }}
               onMouseEnter={e => {
-                if (isGlass) {
-                  e.currentTarget.style.borderColor = "var(--ci-pill-border)";
-                  return;
-                }
-                e.currentTarget.style.background = "var(--ci-surface-hi)";
-                e.currentTarget.style.borderColor = "var(--ci-accent-bdr)";
+                e.currentTarget.style.color = "var(--ci-text)";
+                e.currentTarget.style.opacity = "0.8";
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = "var(--ci-surface)";
-                e.currentTarget.style.borderColor = "var(--ci-border)";
+                e.currentTarget.style.color = "var(--ci-text-muted)";
+                e.currentTarget.style.opacity = "1";
               }}
             >
-              <span style={{ fontSize: 14, lineHeight: 1, color: "var(--ci-accent)" }}>+</span>
+              <span style={{ fontSize: 13, lineHeight: 1, color: "var(--ci-accent)" }}>+</span>
               添加 Workspace
             </motion.button>
           )}
