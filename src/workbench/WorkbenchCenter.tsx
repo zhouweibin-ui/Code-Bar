@@ -60,7 +60,15 @@ function WelcomeEntry({
   action?: React.ReactNode;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, padding: "10px 0", borderTop: "1px solid var(--ci-toolbar-border)" }}>
+    <div
+      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, padding: "10px 0", borderTop: "1px solid var(--ci-toolbar-border)", transition: "background 0.12s" }}
+      onMouseEnter={e => {
+        e.currentTarget.style.background = "var(--ci-list-hover-bg)";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.background = "transparent";
+      }}
+    >
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ci-text)" }}>{title}</div>
         {detail && <div style={{ marginTop: 3, fontSize: 11, color: "var(--ci-text-dim)", lineHeight: 1.6 }}>{detail}</div>}
@@ -72,6 +80,7 @@ function WelcomeEntry({
 
 function WorkbenchWelcome({ session }: { session: ClaudeSession | null }) {
   const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const activeWorkspace = useWorkspaceStore((s) => s.workspaces.find((workspace) => workspace.id === s.activeWorkspaceId) ?? null);
   const openSettings = useSettingsStore((s) => s.openSettings);
   const sessions = useSessionStore((s) => s.sessions);
@@ -79,6 +88,7 @@ function WorkbenchWelcome({ session }: { session: ClaudeSession | null }) {
   const recentSessions = activeWorkspace
     ? sessions.filter((item) => item.workspaceId === activeWorkspace.id).slice(0, 5)
     : [];
+  const otherWorkspaces = workspaces.filter((workspace) => workspace.id !== activeWorkspaceId).slice(0, 4);
 
   return (
     <div style={{ width: "100%", height: "100%", overflowY: "auto" }}>
@@ -99,9 +109,9 @@ function WorkbenchWelcome({ session }: { session: ClaudeSession | null }) {
               <WelcomeList title="Start">
                 {session ? (
                   <>
-                    <WelcomeEntry title="Open current session" action={<WelcomeAction label="Open" accent onClick={() => showSessionSurface(session.id)} />} />
-                    <WelcomeEntry title="Open Explorer" action={<WelcomeAction label="Explorer" onClick={() => showExplorer(session.id)} />} />
-                    <WelcomeEntry title="Open Source Control" action={<WelcomeAction label="SCM" onClick={() => showScm(session.id)} />} />
+                    <WelcomeEntry title="Open current session" detail="Continue the active terminal context." action={<WelcomeAction label="Open" accent onClick={() => showSessionSurface(session.id)} />} />
+                    <WelcomeEntry title="Open Explorer" detail="Browse files and start editing." action={<WelcomeAction label="Explorer" onClick={() => showExplorer(session.id)} />} />
+                    <WelcomeEntry title="Open Source Control" detail="Review current changes and conflicts." action={<WelcomeAction label="SCM" onClick={() => showScm(session.id)} />} />
                   </>
                 ) : (
                   <WelcomeEntry title="Create or choose a session" detail="Use the sidebar on the left." />
@@ -116,7 +126,7 @@ function WorkbenchWelcome({ session }: { session: ClaudeSession | null }) {
                     action={<WelcomeAction label="Open" onClick={() => showSessionSurface(recent.id)} />}
                   />
                 )) : (
-                  <WelcomeEntry title="No recent sessions" />
+                  <WelcomeEntry title="No recent sessions" detail="New sessions will appear here." />
                 )}
               </WelcomeList>
             </>
@@ -137,6 +147,44 @@ function WorkbenchWelcome({ session }: { session: ClaudeSession | null }) {
             </>
           )}
         </div>
+
+        {hasWorkspace && otherWorkspaces.length > 0 && (
+          <div style={{ marginTop: 34, maxWidth: 520 }}>
+            <div style={{ fontSize: 10, color: "var(--ci-text-dim)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              Other Workspaces
+            </div>
+            <div style={{ marginTop: 10 }}>
+              {otherWorkspaces.map((workspace) => {
+                const workspaceSessions = sessions.filter((item) => item.workspaceId === workspace.id);
+                const topSession = workspaceSessions[0] ?? null;
+                return (
+                  <div
+                    key={workspace.id}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "8px 0", borderTop: "1px solid var(--ci-toolbar-border)", transition: "background 0.12s" }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "var(--ci-list-hover-bg)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 11.5, color: "var(--ci-text-muted)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {workspace.name}
+                      </div>
+                      {topSession && (
+                        <div style={{ marginTop: 2, fontSize: 10, color: "var(--ci-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {topSession.name}
+                        </div>
+                      )}
+                    </div>
+                    <WelcomeAction label="Switch" onClick={() => useWorkspaceStore.getState().bringToFront(workspace.id)} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
