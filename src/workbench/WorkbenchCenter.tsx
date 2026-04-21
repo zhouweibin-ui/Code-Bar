@@ -1,7 +1,8 @@
+import { invoke } from "@tauri-apps/api/core";
 import { SplitDetailHost } from "../components/SplitSwapLayout";
 import { ExploreEditor } from "../components/ExploreMode";
 import { showSessionSurface, showExplorer, showScm } from "../services/workbenchCommands";
-import { useSettingsStore } from "../store/settingsStore";
+import { sanitizeRunnerConfig, useSettingsStore } from "../store/settingsStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { useWorkbenchStore } from "../store/workbenchStore";
 import { useSessionStore, type ClaudeSession } from "../store/sessionStore";
@@ -61,7 +62,7 @@ function WelcomeEntry({
 }) {
   return (
     <div
-      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, padding: "10px 0", borderTop: "1px solid var(--ci-toolbar-border)", transition: "background 0.12s" }}
+      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, padding: "10px 8px", borderTop: "1px solid var(--ci-toolbar-border)", transition: "background 0.12s" }}
       onMouseEnter={e => {
         e.currentTarget.style.background = "var(--ci-list-hover-bg)";
       }}
@@ -81,14 +82,102 @@ function WelcomeEntry({
 function WorkbenchWelcome({ session }: { session: ClaudeSession | null }) {
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const addWorkspace = useWorkspaceStore((s) => s.addWorkspace);
   const activeWorkspace = useWorkspaceStore((s) => s.workspaces.find((workspace) => workspace.id === s.activeWorkspaceId) ?? null);
-  const openSettings = useSettingsStore((s) => s.openSettings);
   const sessions = useSessionStore((s) => s.sessions);
+  const addSession = useSessionStore((s) => s.addSession);
+  const setActiveSession = useSessionStore((s) => s.setActiveSession);
+  const setExpandedSession = useSessionStore((s) => s.setExpandedSession);
+  const markWorktreeReady = useSessionStore((s) => s.markWorktreeReady);
+  const focusSession = useWorkbenchStore((s) => s.focusSession);
+  const runner = sanitizeRunnerConfig(useSettingsStore((s) => s.settings.runner));
   const hasWorkspace = workspaces.length > 0;
   const recentSessions = activeWorkspace
     ? sessions.filter((item) => item.workspaceId === activeWorkspace.id).slice(0, 5)
     : [];
   const otherWorkspaces = workspaces.filter((workspace) => workspace.id !== activeWorkspaceId).slice(0, 4);
+
+  const handleAddWorkspace = async () => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    const picked = await invoke<string>("pick_folder").catch(() => "");
+    const trimmed = picked.trim();
+    if (!trimmed) return;
+    const workspaceId = addWorkspace(trimmed);
+    await invoke("clear_deleted_items", {
+      sessionIds: [],
+      workspaceIds: [],
+      sessionRefs: [],
+      workspaceRefs: [{ workspaceId, path: trimmed }],
+    }).catch(() => {});
+    await invoke("trust_workspace", { path: trimmed }).catch(() => {});
+  };
+
+  const handleNewSession = async () => {
+    if (!activeWorkspace) return;
+
+    let id: string;
+    if ("__TAURI_INTERNALS__" in window) {
+      try {
+        id = await invoke<string>("reserve_session_id", {
+          workspaces: workspaces.map((workspace) => ({
+            workspaceId: workspace.id,
+            workspacePath: workspace.path,
+          })),
+          existingSessionIds: sessions.map((item) => item.id),
+        });
+      } catch {
+        return;
+      }
+    } else {
+      const maxId = sessions
+        .map((item) => Number(item.id))
+        .filter((value) => !Number.isNaN(value))
+        .reduce((max, value) => Math.max(max, value), 0);
+      id = String(maxId + 1);
+    }
+
+    addSession(id, activeWorkspace.id, activeWorkspace.path, undefined, { ...runner });
+    setActiveSession(id);
+    setExpandedSession(id);
+    focusSession(id);
+
+    if ("__TAURI_INTERNALS__" in window) {
+      await invoke("clear_deleted_items", {
+        sessionIds: [id],
+        workspaceIds: [],
+        sessionRefs: [{ sessionId: id, workspaceId: activeWorkspace.id }],
+        workspaceRefs: [],
+      }).catch(() => {});
+      await invoke("remember_session_workdir", {
+        sessionId: id,
+        workdir: activeWorkspace.path,
+      }).catch(() => {});
+      try {
+        const result = await invoke<{
+          worktree_path: string;
+          branch: string;
+          base_branch: string;
+        } | null>("setup_session_worktree", {
+          workdir: activeWorkspace.path,
+          sessionId: id,
+        });
+        if (result) {
+          await invoke("remember_session_workdir", {
+            sessionId: id,
+            workdir: result.worktree_path,
+          }).catch(() => {});
+          useSessionStore.getState().updateSession(id, {
+            workdir: result.worktree_path,
+            worktreePath: result.worktree_path,
+            branchName: result.branch,
+            baseBranch: result.base_branch,
+          });
+        }
+      } catch {}
+    }
+
+    markWorktreeReady(id);
+  };
 
   return (
     <div style={{ width: "100%", height: "100%", overflowY: "auto" }}>
@@ -114,7 +203,11 @@ function WorkbenchWelcome({ session }: { session: ClaudeSession | null }) {
                     <WelcomeEntry title="Open Source Control" detail="Review current changes and conflicts." action={<WelcomeAction label="SCM" onClick={() => showScm(session.id)} />} />
                   </>
                 ) : (
-                  <WelcomeEntry title="Create or choose a session" detail="Use the sidebar on the left." />
+                  <WelcomeEntry
+                    title="Create or choose a session"
+                    detail="Use the sidebar on the left, or create one now."
+                    action={<WelcomeAction label="New" accent onClick={() => { void handleNewSession(); }} />}
+                  />
                 )}
               </WelcomeList>
               <WelcomeList title="Recent">
@@ -135,8 +228,8 @@ function WorkbenchWelcome({ session }: { session: ClaudeSession | null }) {
               <WelcomeList title="Start">
                 <WelcomeEntry
                   title="Add workspace"
-                  detail="Use the Workspace section in the sidebar."
-                  action={<WelcomeAction label="Open Settings" accent onClick={() => openSettings("appearance")} />}
+                  detail="Choose a project folder and make it the current workspace."
+                  action={<WelcomeAction label="Add" accent onClick={() => { void handleAddWorkspace(); }} />}
                 />
                 <WelcomeEntry title="Create a session" detail="Available after a workspace is added." />
               </WelcomeList>
@@ -160,7 +253,7 @@ function WorkbenchWelcome({ session }: { session: ClaudeSession | null }) {
                 return (
                   <div
                     key={workspace.id}
-                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "8px 0", borderTop: "1px solid var(--ci-toolbar-border)", transition: "background 0.12s" }}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "8px 8px", borderTop: "1px solid var(--ci-toolbar-border)", transition: "background 0.12s" }}
                     onMouseEnter={e => {
                       e.currentTarget.style.background = "var(--ci-list-hover-bg)";
                     }}
