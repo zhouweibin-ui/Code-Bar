@@ -26,7 +26,6 @@ export interface ApiKeys {
 }
 
 export type ThemeMode = "light" | "dark" | "glass" | "system";
-export type LayoutMode = "original" | "split";
 
 export function isGlassTheme(theme: ThemeMode): theme is "glass" {
   return theme === "glass";
@@ -36,10 +35,6 @@ export function normalizeThemeMode(theme: string | undefined): ThemeMode {
   if (theme === "liquid") return "glass";
   if (theme === "dark" || theme === "glass" || theme === "system") return theme;
   return "light";
-}
-
-export function normalizeLayoutMode(layoutMode: string | undefined): LayoutMode {
-  return layoutMode === "split" ? "split" : "original";
 }
 
 export function normalizeSplitPaneSidebarWidth(width: unknown): number {
@@ -210,7 +205,6 @@ export interface Settings {
   apiKeys: ApiKeys;
   locale: LocaleSetting;
   theme: ThemeMode;
-  layoutMode: LayoutMode;
   splitPaneSidebarWidth: number;
   splitWidgetPanelWidth: number;
   splitWidgetPanelCollapsed: boolean;
@@ -271,7 +265,6 @@ const DEFAULT_SETTINGS: Settings = {
   },
   locale: "system",
   theme: "light",
-  layoutMode: "original",
   splitPaneSidebarWidth: 420,
   splitWidgetPanelWidth: 260,
   splitWidgetPanelCollapsed: true,
@@ -368,7 +361,6 @@ export const useSettingsStore = create<SettingsStore>()(
         const persistedSettings = (p.settings ?? {}) as Partial<Settings> & {
           locale?: string;
           theme?: string;
-          layoutMode?: string;
           splitPaneSidebarWidth?: unknown;
           splitWidgetPanelWidth?: unknown;
           splitWidgetPanelCollapsed?: unknown;
@@ -386,7 +378,6 @@ export const useSettingsStore = create<SettingsStore>()(
             ...persistedSettings,
             locale: normalizeLocaleSetting(persistedSettings.locale),
             theme: normalizeThemeMode(persistedSettings.theme),
-            layoutMode: normalizeLayoutMode(persistedSettings.layoutMode),
             splitPaneSidebarWidth: normalizeSplitPaneSidebarWidth(persistedSettings.splitPaneSidebarWidth),
             splitWidgetPanelWidth: normalizeSplitWidgetPanelWidth(persistedSettings.splitWidgetPanelWidth),
             splitWidgetPanelCollapsed: persistedSettings.splitWidgetPanelCollapsed === true,

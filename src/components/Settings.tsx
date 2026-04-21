@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { type LocaleSetting, useAppI18n } from "../i18n";
-import { useSettingsStore, type ThemeMode, type LayoutMode, type SplitWidgetCanvasItem, isGlassTheme } from "../store/settingsStore";
+import { useSettingsStore, type ThemeMode, type SplitWidgetCanvasItem, isGlassTheme } from "../store/settingsStore";
 
 const C = {
   surface: "var(--ci-surface)",
@@ -89,7 +89,6 @@ function AppearanceTab() {
   const { settings, patchSettings } = useSettingsStore();
 
   type ThemeOption = ThemeMode;
-  type LayoutOption = LayoutMode;
 
   const themeOptions: {
     value: ThemeOption;
@@ -135,26 +134,6 @@ function AppearanceTab() {
       card: "rgba(255,255,255,0.62)",
       accent: "#4f7bff",
       textColor: "#243347",
-    },
-  ];
-
-  const layoutOptions: {
-    value: LayoutOption;
-    label: string;
-    desc: string;
-    preview: string;
-  }[] = [
-    {
-      value: "original",
-      label: t("settings.layoutOptions.original.label"),
-      desc: t("settings.layoutOptions.original.description"),
-      preview: t("settings.layoutOptions.original.preview"),
-    },
-    {
-      value: "split",
-      label: t("settings.layoutOptions.split.label"),
-      desc: t("settings.layoutOptions.split.description"),
-      preview: t("settings.layoutOptions.split.preview"),
     },
   ];
 
@@ -293,125 +272,6 @@ function AppearanceTab() {
         </div>
       </div>
 
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.textDim, marginBottom: 10 }}>
-          {t("settings.sections.layout")}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-          {layoutOptions.map((opt) => {
-            const active = settings.layoutMode === opt.value;
-            return (
-              <button
-                key={opt.value}
-                onClick={() => patchSettings({ layoutMode: opt.value })}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 12,
-                  padding: 12,
-                  background: active ? "linear-gradient(180deg, var(--ci-surface-hi), var(--ci-surface))" : C.surface,
-                  border: `1px solid ${active ? C.accentBdr : C.border}`,
-                  borderRadius: 18,
-                  cursor: "pointer",
-                  textAlign: "start",
-                  transition: "transform 0.16s, border-color 0.16s, box-shadow 0.16s, background 0.16s",
-                  boxShadow: active ? `0 0 0 3px ${C.accentBg}, var(--ci-card-shadow-strong)` : "none",
-                  transform: active ? "translateY(-1px)" : "translateY(0)",
-                }}
-              >
-                <div
-                  style={{
-                    height: 118,
-                    borderRadius: 14,
-                    border: `1px solid ${C.border}`,
-                    background: "linear-gradient(180deg, var(--ci-surface-hi), var(--ci-surface))",
-                    padding: 14,
-                    boxSizing: "border-box",
-                    display: "flex",
-                    alignItems: "stretch",
-                    gap: opt.value === "split" ? 10 : 0,
-                    color: C.textMuted,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    whiteSpace: "pre-line",
-                  }}
-                >
-                  {opt.value === "split" ? (
-                    <>
-                      <div
-                        style={{
-                          width: "42%",
-                          borderRadius: 10,
-                          border: `1px solid ${C.border}`,
-                          background: "var(--ci-surface)",
-                          padding: 10,
-                          boxSizing: "border-box",
-                        }}
-                      >
-                        {t("settings.layoutOptions.split.left")}
-                      </div>
-                      <div
-                        style={{
-                          flex: 1,
-                          borderRadius: 10,
-                          border: `1px solid ${C.accentBdr}`,
-                          background: "var(--ci-accent-bg)",
-                          color: C.accent,
-                          padding: 10,
-                          boxSizing: "border-box",
-                        }}
-                      >
-                        {t("settings.layoutOptions.split.right")}
-                      </div>
-                    </>
-                  ) : (
-                    <div
-                      style={{
-                        width: "100%",
-                        borderRadius: 10,
-                        border: `1px solid ${C.border}`,
-                        background: "var(--ci-surface)",
-                        padding: 10,
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      {opt.preview}
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.textDim, marginBottom: 4 }}>
-                      {active ? t("common.current") : t("common.layout")}
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: active ? 700 : 600, color: active ? C.accent : C.text }}>{opt.label}</div>
-                    <div style={{ fontSize: 11, color: C.textDim, marginTop: 4, lineHeight: 1.5 }}>{opt.desc}</div>
-                  </div>
-                  <div
-                    style={{
-                      minWidth: 20,
-                      height: 20,
-                      padding: active ? "0 8px" : 0,
-                      borderRadius: 999,
-                      border: `1px solid ${active ? C.accentBdr : "transparent"}`,
-                      background: active ? C.accentBg : "transparent",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: active ? C.accent : C.textDim,
-                      fontSize: 11,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {active ? t("common.selected") : "○"}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
@@ -591,17 +451,16 @@ function resolveVisibleSettingsTab(tab: string): VisibleSettingsTab {
 
 export default function Settings() {
   const { t } = useAppI18n();
-  const { settings, settingsOpen, closeSettings, activeTab, setTab } = useSettingsStore();
+  const { settingsOpen, closeSettings, activeTab, setTab } = useSettingsStore();
   const isGlass = useSettingsStore((s) => isGlassTheme(s.settings.theme));
   const textShadow = isGlass ? "var(--ci-glass-text-shadow)" : "none";
   const strongTextShadow = isGlass ? "var(--ci-glass-text-shadow-strong)" : "none";
-  const visibleTab = settings.layoutMode !== "split" && activeTab === "components" ? "appearance" : resolveVisibleSettingsTab(activeTab);
+  const visibleTab = resolveVisibleSettingsTab(activeTab);
   const navItems: { value: VisibleSettingsTab; label: string }[] = [
     { value: "appearance", label: t("settings.tabs.appearance") },
     { value: "components", label: t("settings.tabs.components") },
     { value: "system", label: t("settings.tabs.system") },
   ];
-  const visibleNavItems = settings.layoutMode === "split" ? navItems : navItems.filter((item) => item.value !== "components");
 
   if (!settingsOpen) return null;
 
@@ -690,7 +549,7 @@ export default function Settings() {
         <div style={{ flex: 1, minHeight: 0, padding: "0 18px 18px", background: isGlass ? "var(--ci-bg-grad)" : "transparent" }}>
           <div style={{ minHeight: 0, height: "100%", borderRadius: 22, background: "transparent", boxShadow: "none", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 20, flexWrap: "wrap", padding: "0 18px", background: "transparent", flexShrink: 0 }}>
-              {visibleNavItems.map((item) => {
+              {navItems.map((item) => {
                 const active = visibleTab === item.value;
                 return (
                   <button

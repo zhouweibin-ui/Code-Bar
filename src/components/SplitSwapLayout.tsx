@@ -18,6 +18,7 @@ import {
   type SplitWidgetCanvasItem,
   type SplitWidgetTerminalItem,
 } from "../store/settingsStore";
+import { resetWorkbenchMode } from "../services/workbenchCommands";
 import { useSessionStore } from "../store/sessionStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
 
@@ -570,16 +571,28 @@ export function SplitDetailHost() {
         {item.kind === "terminal" && <SplitStaticTerminalTabs itemId={item.id} />}
         {item.kind === "session-detail" && expandedSessionId && (
           <button
-            onClick={() => setExpandedSession(null)}
+            onClick={() => {
+              setExpandedSession(null);
+              resetWorkbenchMode();
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = "var(--ci-text)";
+              e.currentTarget.style.opacity = "0.8";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = "var(--ci-text-muted)";
+              e.currentTarget.style.opacity = "1";
+            }}
             style={{
-              background: "var(--ci-btn-ghost-bg)",
-              border: "1px solid var(--ci-toolbar-border)",
-              borderRadius: 7,
+              background: "none",
+              border: "none",
               color: "var(--ci-text-muted)",
               cursor: "pointer",
               fontSize: 11,
-              padding: "4px 8px",
+              fontWeight: 600,
+              padding: "4px 2px",
               flexShrink: 0,
+              transition: "color 0.12s, opacity 0.12s",
             }}
           >
             {t("split.collapse")}

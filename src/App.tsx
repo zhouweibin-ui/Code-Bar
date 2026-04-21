@@ -5,11 +5,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { consumeSuppressedEditorReveal, filterVisibleExplorerDirectories, reloadExplorerDirectories, reloadVisibleDirectories, revealExplorerPath } from "./services/editorCommands";
 import { setLiquidGlassEffect, GlassMaterialVariant } from "tauri-plugin-liquid-glass-api";
 import { motion } from "framer-motion";
-import { TitleBar } from "./components/TitleBar";
-import { StatusBar } from "./components/StatusBar";
 import { WorkspaceStack } from "./components/WorkspaceStack";
 import { SessionList } from "./components/SessionList";
-import { SessionDetail } from "./components/SessionDetail";
 import { SplitWidgetPanel } from "./components/SplitWidgetPanel";
 import { SplitSwapProvider } from "./components/SplitSwapLayout";
 import { WorkbenchSidebar } from "./workbench/WorkbenchSidebar";
@@ -83,9 +80,7 @@ export default function App() {
   const focusSession = useWorkbenchStore((s) => s.focusSession);
   const focusedSessionId = useWorkbenchStore((s) => s.focusedSessionId);
   const isGlass = isGlassTheme(settings.theme);
-  const isOriginalLayout = settings.layoutMode === "original";
-  const overlaySessionOpen = isOriginalLayout && expandedSessionId !== null;
-  const isSubPageOpen = settingsOpen || overlaySessionOpen;
+  const isSubPageOpen = settingsOpen;
   const refreshInFlightRef = useRef<Record<string, Promise<void> | null>>({});
   const refreshQueuedRef = useRef<Record<string, boolean>>({});
   const refreshQueuedOptionsRef = useRef<Record<string, { reloadExplorer?: boolean; reloadDirs?: string[] } | undefined>>({});
@@ -600,25 +595,21 @@ export default function App() {
         closeSettings();
         return;
       }
-      if (!isOriginalLayout && sidebarSection !== "sessions") {
+      if (sidebarSection !== "sessions") {
         useWorkbenchStore.getState().resetWorkbenchMode();
         return;
       }
-      if (isOriginalLayout && expandedSessionId !== null) return;
       invoke("close_popup").catch(() => {});
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [settingsOpen, closeSettings, isOriginalLayout, expandedSessionId, sidebarSection]);
+  }, [settingsOpen, closeSettings, sidebarSection]);
 
   // ── 浮窗位置 / 大小记忆：用户拖动/调整后防抖 500ms 写盘 ──
   // 注意：只在基础状态（非展开）下保存，展开状态是临时的，不应覆盖记忆。
   // expandedSessionId 不为 null 表示终端面板已展开。
   const boundsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const suppressBoundsPersistenceRef = useRef(overlaySessionOpen);
-  useEffect(() => {
-    suppressBoundsPersistenceRef.current = overlaySessionOpen;
-  }, [overlaySessionOpen]);
+  const suppressBoundsPersistenceRef = useRef(false);
 
   useEffect(() => {
     if (!("__TAURI_INTERNALS__" in window)) return;
@@ -1015,8 +1006,6 @@ export default function App() {
 
   return (
     <>
-      {isOriginalLayout && <SessionDetail mode="overlay" />}
-
       <div style={{
         width: "100vw",
         height: "100vh",
@@ -1116,15 +1105,7 @@ export default function App() {
           }}>
             <Settings />
 
-            {isOriginalLayout ? (
-              !isSubPageOpen && (
-                <>
-                  <TitleBar />
-                  {menuContent}
-                  <StatusBar session={activeSession} />
-                </>
-              )
-            ) : (
+            {!isSubPageOpen && (
               <SplitSwapProvider
                 sessionDetailEmptyState={
                   <div style={{
@@ -1227,26 +1208,37 @@ export default function App() {
 
                   {splitWidgetPanelCollapsed ? (
                     <div style={{
-                      width: 42,
+                      width: 34,
                       flexShrink: 0,
                       borderInlineStart: "1px solid var(--ci-toolbar-border)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      background: isGlass ? "var(--ci-toolbar-bg)" : "var(--ci-surface)",
+                      background: "transparent",
                     }}>
                       <button
                         onClick={() => patchSettings({ splitWidgetPanelCollapsed: false })}
                         title={t("app.split.expandWidgets")}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.color = "var(--ci-text)";
+                          e.currentTarget.style.opacity = "0.8";
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.color = "var(--ci-text-dim)";
+                          e.currentTarget.style.opacity = "1";
+                        }}
                         style={{
-                          background: "var(--ci-btn-ghost-bg)",
-                          border: "1px solid var(--ci-toolbar-border)",
-                          color: "var(--ci-text-muted)",
+                          background: "none",
+                          border: "none",
+                          color: "var(--ci-text-dim)",
                           cursor: "pointer",
-                          fontSize: 11,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
                           writingMode: "vertical-rl",
-                          padding: "8px 6px",
-                          borderRadius: 8,
+                          padding: "0",
+                          transition: "color 0.12s, opacity 0.12s",
                         }}
                       >
                         {t("app.split.widgets")}
