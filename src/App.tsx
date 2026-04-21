@@ -1195,29 +1195,40 @@ export default function App() {
 
                   {splitWidgetPanelCollapsed ? (
                     <div style={{
-                      width: 42,
+                      width: 34,
                       flexShrink: 0,
                       borderLeft: "1px solid var(--ci-toolbar-border)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      background: isGlass ? "var(--ci-toolbar-bg)" : "var(--ci-surface)",
+                      background: "transparent",
                     }}>
                       <button
                         onClick={() => patchSettings({ splitWidgetPanelCollapsed: false })}
                         title="展开组件区"
+                        onMouseEnter={e => {
+                          e.currentTarget.style.color = "var(--ci-text)";
+                          e.currentTarget.style.opacity = "0.8";
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.color = "var(--ci-text-dim)";
+                          e.currentTarget.style.opacity = "1";
+                        }}
                         style={{
-                          background: "var(--ci-btn-ghost-bg)",
-                          border: "1px solid var(--ci-toolbar-border)",
-                          color: "var(--ci-text-muted)",
+                          background: "none",
+                          border: "none",
+                          color: "var(--ci-text-dim)",
                           cursor: "pointer",
-                          fontSize: 11,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
                           writingMode: "vertical-rl",
-                          padding: "8px 6px",
-                          borderRadius: 8,
+                          padding: "0",
+                          transition: "color 0.12s, opacity 0.12s",
                         }}
                       >
-                        组件
+                        Widgets
                       </button>
                     </div>
                   ) : (
