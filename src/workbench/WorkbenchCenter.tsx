@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppI18n } from "../i18n";
 import { SplitDetailHost } from "../components/SplitSwapLayout";
@@ -62,9 +63,9 @@ function WelcomeEntry({
   return (
     <div
       style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) auto",
+        alignItems: "start",
         gap: 18,
         padding: "10px 8px",
         borderTop: "1px solid var(--ci-toolbar-border)",
@@ -81,13 +82,15 @@ function WelcomeEntry({
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ci-text)" }}>{title}</div>
         {detail && <div style={{ marginTop: 3, fontSize: 11, color: "var(--ci-text-dim)", lineHeight: 1.6 }}>{detail}</div>}
       </div>
-      {action && <div style={{ flexShrink: 0 }}>{action}</div>}
+      {action && <div style={{ flexShrink: 0, alignSelf: "center" }}>{action}</div>}
     </div>
   );
 }
 
 function WorkbenchWelcome({ session }: { session: ClaudeSession | null }) {
   const { t } = useAppI18n();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [compactHeader, setCompactHeader] = useState(false);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const addWorkspace = useWorkspaceStore((s) => s.addWorkspace);
@@ -104,6 +107,19 @@ function WorkbenchWelcome({ session }: { session: ClaudeSession | null }) {
     ? sessions.filter((item) => item.workspaceId === activeWorkspace.id).slice(0, 5)
     : [];
   const otherWorkspaces = workspaces.filter((workspace) => workspace.id !== activeWorkspaceId).slice(0, 4);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+
+    const observer = new ResizeObserver(() => {
+      setCompactHeader(element.clientWidth < 560);
+    });
+
+    observer.observe(element);
+    setCompactHeader(element.clientWidth < 560);
+    return () => observer.disconnect();
+  }, []);
 
   const handleAddWorkspace = async () => {
     if (!("__TAURI_INTERNALS__" in window)) return;
@@ -189,18 +205,22 @@ function WorkbenchWelcome({ session }: { session: ClaudeSession | null }) {
 
   return (
     <div style={{ width: "100%", height: "100%", overflowY: "auto" }}>
-      <div style={{ width: "100%", maxWidth: 760, margin: "0 auto", padding: "36px 30px 44px", boxSizing: "border-box" }}>
-        <div style={{ fontSize: 10, color: "var(--ci-text-dim)", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-          {t("workbench.welcome.getStarted")}
-        </div>
-        <div style={{ marginTop: 8, fontSize: 26, fontWeight: 700, color: "var(--ci-text)", letterSpacing: -0.5, lineHeight: 1.15 }}>
-          {hasWorkspace ? (activeWorkspace ? activeWorkspace.name : t("workbench.welcome.welcome")) : t("workbench.welcome.noWorkspace")}
-        </div>
-        <div style={{ marginTop: 8, maxWidth: 520, fontSize: 12, color: "var(--ci-text-muted)", lineHeight: 1.7 }}>
-          {hasWorkspace ? t("workbench.welcome.chooseWhereToContinue") : t("workbench.welcome.addProjectToBegin")}
-        </div>
+      <div ref={containerRef} style={{ width: "100%", maxWidth: 760, margin: "0 auto", padding: compactHeader ? "24px 18px 32px" : "36px 30px 44px", boxSizing: "border-box" }}>
+        {!compactHeader && (
+          <>
+            <div style={{ fontSize: 10, color: "var(--ci-text-dim)", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              {t("workbench.welcome.getStarted")}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 26, fontWeight: 700, color: "var(--ci-text)", letterSpacing: -0.5, lineHeight: 1.15 }}>
+              {hasWorkspace ? (activeWorkspace ? activeWorkspace.name : t("workbench.welcome.welcome")) : t("workbench.welcome.noWorkspace")}
+            </div>
+            <div style={{ marginTop: 8, maxWidth: 520, fontSize: 12, color: "var(--ci-text-muted)", lineHeight: 1.7 }}>
+              {hasWorkspace ? t("workbench.welcome.chooseWhereToContinue") : t("workbench.welcome.addProjectToBegin")}
+            </div>
+          </>
+        )}
 
-        <div style={{ marginTop: 30, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 36 }}>
+        <div style={{ marginTop: compactHeader ? 0 : 30, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: compactHeader ? 24 : 36 }}>
           {hasWorkspace ? (
             <>
               <WelcomeList title={t("workbench.welcome.start")}>

@@ -12,6 +12,7 @@ import {
 } from "../store/workspaceStore";
 import { useSessionStore, type ClaudeSession } from "../store/sessionStore";
 import { useSettingsStore, isGlassTheme } from "../store/settingsStore";
+import { useWorkbenchStore } from "../store/workbenchStore";
 
 // ── 常量 ─────────────────────────────────────────────────────
 const SUMMARY_ROW_H = 34;
@@ -575,6 +576,10 @@ export function WorkspaceStack() {
 
     removeSessionsByWorkspace(id);
     removeWorkspace(id);
+
+    if (workspaces.length === 1) {
+      useWorkbenchStore.getState().resetWorkbenchMode();
+    }
 
     if (!("__TAURI_INTERNALS__" in window) || !workspace?.path) {
       return;
