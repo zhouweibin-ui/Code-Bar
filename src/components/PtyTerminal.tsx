@@ -338,12 +338,12 @@ export function PtyTerminal({
     );
 
     return () => {
-      u1.then((f) => f());
-      u2.then((f) => f());
-      u3.then((f) => f());
-      u4.then((f) => f());
-      u5.then((f) => f());
-      u6.then((f) => f());
+      u1.then((f) => f()).catch(() => {});
+      u2.then((f) => f()).catch(() => {});
+      u3.then((f) => f()).catch(() => {});
+      u4.then((f) => f()).catch(() => {});
+      u5.then((f) => f()).catch(() => {});
+      u6.then((f) => f()).catch(() => {});
     };
   }, [sessionId]);
 

@@ -254,7 +254,7 @@ export function useSessionRunnerController({
         setQuerySent(false);
       }, 1200);
     });
-    return () => { u.then((f: () => void) => f()); };
+    return () => { void u.then((f) => f()).catch(() => {}); };
   }, [updateSession]);
 
   useEffect(() => {

@@ -61,13 +61,17 @@ function InstallTerminal({ installId, installCmd, onFinished }: InstallTerminalP
 
   useEffect(() => {
     if (!containerRef.current) return;
-    let term: import("@xterm/xterm").Terminal;
-    let fit: import("@xterm/addon-fit").FitAddon;
+    let term: import("@xterm/xterm").Terminal | undefined;
+    let fit: import("@xterm/addon-fit").FitAddon | undefined;
+    const listeners: Array<Promise<() => Promise<void> | void>> = [];
+    let cancelled = false;
 
-    (async () => {
+    void (async () => {
       const { listen } = await import("@tauri-apps/api/event");
       const { Terminal } = await import("@xterm/xterm");
       const { FitAddon } = await import("@xterm/addon-fit");
+      if (cancelled || !containerRef.current) return;
+
       term = new Terminal({
         theme: { background: "#0a0a0c", foreground: "#e2e8f0", cursor: "#60a5fa" },
         fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
@@ -79,7 +83,7 @@ function InstallTerminal({ installId, installCmd, onFinished }: InstallTerminalP
       });
       fit = new FitAddon();
       term.loadAddon(fit);
-      term.open(containerRef.current!);
+      term.open(containerRef.current);
       fit.fit();
       termRef.current = term;
       fitRef.current = fit;
@@ -99,7 +103,7 @@ function InstallTerminal({ installId, installCmd, onFinished }: InstallTerminalP
         rows,
         env: null,
       }).catch((e) => {
-        term.writeln(`\x1b[31m${t("session.installFailed", { error: String(e) })}\x1b[0m`);
+        term?.writeln(`\x1b[31m${t("session.installFailed", { error: String(e) })}\x1b[0m`);
       });
 
       const u1 = listen<{ session_id: string; data: string }>("pty-data", ({ payload }) => {
@@ -117,13 +121,19 @@ function InstallTerminal({ installId, installCmd, onFinished }: InstallTerminalP
         setTimeout(onFinished, 800);
       });
 
-      return () => {
-        u1.then((f) => f());
-        u2.then((f) => f());
-      };
+      listeners.push(u1, u2);
+      if (cancelled) {
+        listeners.forEach((promise) => {
+          void promise.then((f) => f()).catch(() => {});
+        });
+      }
     })();
 
     return () => {
+      cancelled = true;
+      listeners.forEach((promise) => {
+        void promise.then((f) => f()).catch(() => {});
+      });
       term?.dispose();
       termRef.current = null;
       fitRef.current = null;

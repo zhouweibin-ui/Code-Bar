@@ -658,8 +658,8 @@ export default function App() {
 
     return () => {
       if (boundsTimerRef.current) clearTimeout(boundsTimerRef.current);
-      unlistenMoved.then((f) => f());
-      unlistenResized.then((f) => f());
+      unlistenMoved.then((f) => f()).catch(() => {});
+      unlistenResized.then((f) => f()).catch(() => {});
     };
   }, []);
 
@@ -685,7 +685,7 @@ export default function App() {
         });
       }
     });
-    return () => { unlisten.then((f) => f()); };
+    return () => { unlisten.then((f) => f()).catch(() => {}); };
   }, [setExpandedSession, refreshSessionDiff]);
 
   // ── 启动时批量信任所有已有 workspace 目录（写入 claude settings）──
@@ -908,7 +908,7 @@ export default function App() {
     );
 
     return () => {
-      [u1, u2, u3, u4, u5, u5b, u5c, u5d, u6, u7].forEach((p) => p.then((f) => f()));
+      [u1, u2, u3, u4, u5, u5b, u5c, u5d, u6, u7].forEach((p) => p.then((f) => f()).catch(() => {}));
     };
   }, [appendOutput, updateSession, setDiffFiles, setScmSnapshot, setScmStatus, setScmDiffOverride, refreshSessionDiff]);
 
