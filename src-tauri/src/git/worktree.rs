@@ -10,6 +10,20 @@ use crate::runtime_scope::session_worktree_root_dir;
 use crate::util::{background_command, expand_path, normalize_expanded_path};
 
 // ── 辅助函数 ──────────────────────────────────────────────────────
+fn is_svn_working_copy(workdir: &Path) -> bool {
+    let mut current = Some(workdir);
+    while let Some(path) = current {
+        if path.join(".svn").exists() {
+            return true;
+        }
+        if path.join(".git").exists() {
+            return false;
+        }
+        current = path.parent();
+    }
+    false
+}
+
 pub fn session_branch_prefix() -> String {
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -302,6 +316,10 @@ pub async fn setup_session_worktree(
     let session_id_clone = session_id.clone();
 
     tokio::task::spawn_blocking(move || {
+        if is_svn_working_copy(Path::new(&expanded_workdir)) {
+            return Ok(None);
+        }
+
         // 检测是否是 git 仓库
         let branch_out = background_command("git")
             .current_dir(&expanded_workdir)
@@ -572,6 +590,41 @@ mod tests {
     fn assert_git(workdir: &Path, args: &[&str]) {
         let status = git_status(workdir, args);
         assert!(status.success(), "git {:?} failed with {status}", args);
+    }
+
+    #[test]
+    fn setup_session_worktree_skips_svn_working_copy_inside_git_parent() {
+        let root = test_path("svn-worktree-skip");
+        let repo = root.join("repo");
+        let svn_project = repo.join("legacy-svn");
+        fs::create_dir_all(svn_project.join(".svn")).unwrap();
+
+        if !git_status(&repo, &["init", "-b", "main"]).success() {
+            assert_git(&repo, &["init"]);
+            assert_git(&repo, &["checkout", "-b", "main"]);
+        }
+        assert_git(&repo, &["config", "user.email", "code-bar@example.test"]);
+        assert_git(&repo, &["config", "user.name", "Code Bar Test"]);
+        fs::write(repo.join("README.md"), "base\n").unwrap();
+        assert_git(&repo, &["add", "README.md"]);
+        assert_git(&repo, &["commit", "-m", "base"]);
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = runtime.block_on(setup_session_worktree(
+            svn_project.to_string_lossy().to_string(),
+            "svn-session".to_string(),
+        ));
+
+        assert_eq!(result.unwrap(), None);
+        assert!(
+            !repo.join(session_worktree_root_dir()).exists(),
+            "SVN working copies must not initialize Git session worktrees"
+        );
+
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
