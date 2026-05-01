@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   buildSessionDeleteDialogState,
+  getDeleteDialogViewportLayout,
   getSessionDeleteDialogMode,
   getSessionWorkspacePath,
 } from "../src/components/sessionDeleteLogic.ts";
@@ -40,4 +41,15 @@ test("inspection failures produce an error confirmation dialog state", () => {
 
   assert.equal(state.session, session);
   assert.equal(getSessionDeleteDialogMode(state), "error");
+});
+
+test("small delete dialog viewports use compact wrapped layout", () => {
+  assert.deepEqual(getDeleteDialogViewportLayout({ width: 300, height: 220 }), {
+    compact: true,
+    wrapActions: true,
+  });
+  assert.deepEqual(getDeleteDialogViewportLayout({ width: 420, height: 320 }), {
+    compact: false,
+    wrapActions: false,
+  });
 });

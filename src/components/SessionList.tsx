@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -13,6 +13,7 @@ import { useWorkbenchStore } from "../store/workbenchStore";
 import { showExplorer, showSessionSurface } from "../services/workbenchCommands";
 import {
   buildSessionDeleteDialogState,
+  getDeleteDialogViewportLayout,
   getSessionDeleteDialogMode,
   getSessionWorkspacePath,
   getUncommittedChangeCount,
@@ -434,13 +435,19 @@ function DeleteSessionDialog({
   onConfirm: () => void;
 }) {
   const { t } = useAppI18n();
+  const [viewport, setViewport] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
   const { session, safety, error } = state;
   const dialogMode = getSessionDeleteDialogMode(state);
+  const { compact, wrapActions } = getDeleteDialogViewportLayout(viewport);
   const hasRisk = dialogMode === "risk";
   const hasUncommittedChanges = safety?.hasUncommittedChanges === true;
   const hasUnmergedCommits = safety?.hasUnmergedCommits === true;
   const totalChanges = safety ? getUncommittedChangeCount(safety) : 0;
   const textShadow = isGlass ? "var(--ci-glass-text-shadow)" : "none";
+  const viewportInset = compact ? 8 : 16;
   const title = dialogMode === "error"
     ? t("session.deleteSafetyCheckTitle")
     : hasRisk
@@ -452,6 +459,15 @@ function DeleteSessionDialog({
     { key: "untracked", label: t("session.deleteUnsafeUntracked", { count: safety.untrackedCount }), value: safety.untrackedCount },
     { key: "conflicts", label: t("session.deleteUnsafeConflicts", { count: safety.conflictCount }), value: safety.conflictCount },
   ].filter((row) => row.value > 0) : [];
+
+  useEffect(() => {
+    const updateViewport = () => {
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    return () => window.removeEventListener("resize", updateViewport);
+  }, []);
 
   return (
     <div
@@ -466,7 +482,8 @@ function DeleteSessionDialog({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 16,
+        padding: viewportInset,
+        boxSizing: "border-box",
         background: isGlass ? "rgba(16, 28, 42, 0.16)" : "rgba(8, 11, 18, 0.38)",
         backdropFilter: isGlass ? "none" : "blur(18px) saturate(1.2)",
         WebkitBackdropFilter: isGlass ? "none" : "blur(18px) saturate(1.2)",
@@ -483,11 +500,12 @@ function DeleteSessionDialog({
         transition={{ duration: 0.14 }}
         onMouseDown={(event) => event.stopPropagation()}
         style={{
-          width: "min(420px, calc(100vw - 32px))",
-          maxHeight: "min(520px, calc(100vh - 32px))",
+          width: `min(420px, calc(100vw - ${viewportInset * 2}px))`,
+          maxHeight: `min(520px, calc(100vh - ${viewportInset * 2}px))`,
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
+          boxSizing: "border-box",
           borderRadius: 8,
           background: isGlass ? "var(--ci-surface)" : "linear-gradient(180deg, var(--ci-surface-hi), var(--ci-surface))",
           border: "1px solid var(--ci-border-med)",
@@ -495,11 +513,17 @@ function DeleteSessionDialog({
           color: "var(--ci-text)",
         }}
       >
-        <div style={{ display: "flex", gap: 10, padding: "14px 14px 10px", borderBottom: "1px solid var(--ci-border)" }}>
+        <div style={{
+          display: "flex",
+          gap: compact ? 8 : 10,
+          padding: compact ? "10px 10px 8px" : "14px 14px 10px",
+          borderBottom: "1px solid var(--ci-border)",
+          flexShrink: 0,
+        }}>
           <div
             style={{
-              width: 28,
-              height: 28,
+              width: compact ? 24 : 28,
+              height: compact ? 24 : 28,
               borderRadius: 8,
               flexShrink: 0,
               display: "flex",
@@ -510,10 +534,10 @@ function DeleteSessionDialog({
               color: "var(--ci-red)",
             }}
           >
-            <AlertTriangle size={16} strokeWidth={2} />
+            <AlertTriangle size={compact ? 14 : 16} strokeWidth={2} />
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ci-text)", lineHeight: 1.3 }}>
+            <div style={{ fontSize: compact ? 12 : 13, fontWeight: 700, color: "var(--ci-text)", lineHeight: 1.3 }}>
               {title}
             </div>
             <div style={{ marginTop: 3, fontSize: 11, color: "var(--ci-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -522,7 +546,12 @@ function DeleteSessionDialog({
           </div>
         </div>
 
-        <div style={{ padding: 14, overflow: "auto" }}>
+        <div style={{
+          padding: compact ? 10 : 14,
+          overflow: "auto",
+          flex: "1 1 auto",
+          minHeight: 0,
+        }}>
           {error ? (
             <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--ci-text-muted)" }}>
               {t("session.deleteSafetyCheckBody", { error })}
@@ -536,7 +565,7 @@ function DeleteSessionDialog({
               {hasUncommittedChanges && (
                 <div
                   style={{
-                    padding: 10,
+                    padding: compact ? 8 : 10,
                     borderRadius: 8,
                     background: "var(--ci-btn-ghost-bg)",
                     border: "1px solid var(--ci-border)",
@@ -545,7 +574,12 @@ function DeleteSessionDialog({
                   <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ci-text)" }}>
                     {t("session.deleteUnsafeUncommitted", { count: totalChanges })}
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 10px", marginTop: 8 }}>
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: compact ? "1fr" : "1fr 1fr",
+                    gap: "6px 10px",
+                    marginTop: 8,
+                  }}>
                     {rows.map((row) => (
                       <div key={row.key} style={{ fontSize: 11, color: "var(--ci-text-muted)" }}>
                         {row.label}
@@ -558,7 +592,7 @@ function DeleteSessionDialog({
               {hasUnmergedCommits && safety && (
                 <div
                   style={{
-                    padding: 10,
+                    padding: compact ? 8 : 10,
                     borderRadius: 8,
                     background: "var(--ci-accent-bg)",
                     border: "1px solid var(--ci-accent-bdr)",
@@ -583,16 +617,19 @@ function DeleteSessionDialog({
             display: "flex",
             justifyContent: "flex-end",
             gap: 8,
-            padding: 12,
+            padding: compact ? 8 : 12,
             borderTop: "1px solid var(--ci-border)",
             background: "var(--ci-surface)",
+            flexShrink: 0,
+            flexWrap: wrapActions ? "wrap" : "nowrap",
           }}
         >
           <button
             onClick={onCancel}
             style={{
-              minWidth: 76,
-              height: 30,
+              minWidth: wrapActions ? 0 : 76,
+              height: compact ? 28 : 30,
+              flex: wrapActions ? "1 1 100%" : "0 0 auto",
               borderRadius: 7,
               border: "1px solid var(--ci-border)",
               background: "var(--ci-btn-ghost-bg)",
@@ -607,8 +644,9 @@ function DeleteSessionDialog({
           <button
             onClick={onConfirm}
             style={{
-              minWidth: 96,
-              height: 30,
+              minWidth: wrapActions ? 0 : 96,
+              height: compact ? 28 : 30,
+              flex: wrapActions ? "1 1 100%" : "0 0 auto",
               borderRadius: 7,
               border: "1px solid rgba(255,59,48,0.32)",
               background: "var(--ci-deleted-bg)",
