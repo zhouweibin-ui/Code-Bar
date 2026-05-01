@@ -181,6 +181,12 @@ pub fn resolve_path_from_workdir(workdir: &str, path: &str) -> PathBuf {
 
 pub fn normalize_expanded_path(path: &str) -> String {
     let mut normalized = expand_path(path).trim().replace('\\', "/");
+
+    #[cfg(windows)]
+    if let Some(windows_path) = normalize_wsl_mount_path(&normalized) {
+        normalized = windows_path;
+    }
+
     if normalized == "/" {
         return "/".to_string();
     }
@@ -206,6 +212,28 @@ pub fn normalize_expanded_path(path: &str) -> String {
     normalized.make_ascii_lowercase();
 
     normalized
+}
+
+#[cfg(windows)]
+fn normalize_wsl_mount_path(path: &str) -> Option<String> {
+    let rest = path.strip_prefix("/mnt/")?;
+    let mut chars = rest.chars();
+    let drive = chars.next()?;
+    if !drive.is_ascii_alphabetic() {
+        return None;
+    }
+
+    let remainder = chars.as_str();
+    if !remainder.is_empty() && !remainder.starts_with('/') {
+        return None;
+    }
+
+    let drive = drive.to_ascii_lowercase();
+    let remainder = remainder.trim_start_matches('/');
+    if remainder.is_empty() {
+        return Some(format!("{drive}:/"));
+    }
+    Some(format!("{drive}:/{remainder}"))
 }
 
 fn provider_storage_spec(
@@ -252,7 +280,115 @@ fn provider_runtime_candidates(cli_path: &str, hidden_dir_name: &str) -> Vec<Pat
     candidates
 }
 
-pub fn resolve_provider_dir(runner_type: &str, cli_path_override: &str) -> Option<PathBuf> {
+#[cfg(windows)]
+fn clean_cmd_token(token: &str) -> String {
+    token
+        .trim_matches(|ch| matches!(ch, '"' | '\'' | '`' | ',' | ';'))
+        .to_string()
+}
+
+#[cfg(windows)]
+fn extract_wsl_distro_from_cmd_content(content: &str) -> Option<String> {
+    if !content.to_ascii_lowercase().contains("wsl") {
+        return None;
+    }
+
+    let tokens = content
+        .split_whitespace()
+        .map(clean_cmd_token)
+        .collect::<Vec<_>>();
+
+    for window in tokens.windows(2) {
+        let flag = &window[0];
+        if flag.eq_ignore_ascii_case("-d") || flag.eq_ignore_ascii_case("--distribution") {
+            let distro = window[1].trim();
+            if !distro.is_empty() && distro != "--" {
+                return Some(distro.to_string());
+            }
+        }
+    }
+
+    None
+}
+
+#[cfg(windows)]
+fn extract_wsl_home_from_cmd_content(content: &str) -> Option<String> {
+    let start = content.find("/home/")?;
+    let user_start = start + "/home/".len();
+    let username = content[user_start..]
+        .split(|ch: char| {
+            ch == '/' || ch == '\\' || ch.is_whitespace() || ch == '"' || ch == '\'' || ch == '%'
+        })
+        .next()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+
+    Some(format!("/home/{username}"))
+}
+
+#[cfg(windows)]
+fn wsl_provider_dir_candidates_from_cmd_content(
+    content: &str,
+    hidden_dir_name: &str,
+) -> Vec<PathBuf> {
+    let Some(distro) = extract_wsl_distro_from_cmd_content(content) else {
+        return Vec::new();
+    };
+    let Some(home) = extract_wsl_home_from_cmd_content(content) else {
+        return Vec::new();
+    };
+
+    let provider_path = format!(
+        "{}{}{}",
+        home.trim_end_matches('/'),
+        '/',
+        hidden_dir_name.trim_start_matches('/')
+    )
+    .replace('/', "\\");
+
+    let mut candidates = Vec::new();
+    for prefix in [r"\\wsl.localhost", r"\\wsl$"] {
+        push_unique_path(
+            &mut candidates,
+            PathBuf::from(format!(r"{prefix}\{distro}{provider_path}")),
+        );
+    }
+    candidates
+}
+
+#[cfg(windows)]
+fn provider_wsl_candidates(cli_path: &str, hidden_dir_name: &str) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if cli_path.trim().is_empty() {
+        return candidates;
+    }
+
+    let mut sources = vec![PathBuf::from(cli_path)];
+    if let Ok(canonical) = std::fs::canonicalize(cli_path) {
+        push_unique_path(&mut sources, canonical);
+    }
+
+    for source in sources {
+        let Ok(content) = std::fs::read_to_string(&source) else {
+            continue;
+        };
+        for candidate in wsl_provider_dir_candidates_from_cmd_content(&content, hidden_dir_name) {
+            push_unique_path(&mut candidates, candidate);
+        }
+    }
+
+    candidates
+}
+
+#[cfg(not(windows))]
+fn provider_wsl_candidates(_cli_path: &str, _hidden_dir_name: &str) -> Vec<PathBuf> {
+    Vec::new()
+}
+
+fn build_provider_dir_candidates(
+    runner_type: &str,
+    cli_path_override: &str,
+) -> Option<(Vec<PathBuf>, Vec<PathBuf>, Option<PathBuf>)> {
     let (hidden_dir_name, xdg_dir_name, env_vars) = provider_storage_spec(runner_type)?;
     let mut candidates = Vec::new();
     let mut env_candidates = Vec::new();
@@ -275,6 +411,9 @@ pub fn resolve_provider_dir(runner_type: &str, cli_path_override: &str) -> Optio
     } else {
         find_cli_path(runner_type, "")
     };
+    for candidate in provider_wsl_candidates(&resolved_cli, hidden_dir_name) {
+        push_unique_path(&mut candidates, candidate);
+    }
     for candidate in provider_runtime_candidates(&resolved_cli, hidden_dir_name) {
         push_unique_path(&mut candidates, candidate);
     }
@@ -302,11 +441,27 @@ pub fn resolve_provider_dir(runner_type: &str, cli_path_override: &str) -> Optio
     let home_candidate = home_dir().map(|home| home.join(hidden_dir_name));
     if let Some(home) = home_dir() {
         push_unique_path(&mut candidates, home.join(".config").join(xdg_dir_name));
-        push_unique_path(&mut candidates, home.join(".local/share").join(xdg_dir_name));
+        push_unique_path(
+            &mut candidates,
+            home.join(".local/share").join(xdg_dir_name),
+        );
     }
     if let Some(path) = &home_candidate {
         push_unique_path(&mut candidates, path.clone());
     }
+
+    Some((candidates, env_candidates, home_candidate))
+}
+
+pub fn provider_dir_candidates(runner_type: &str, cli_path_override: &str) -> Vec<PathBuf> {
+    build_provider_dir_candidates(runner_type, cli_path_override)
+        .map(|(candidates, _, _)| candidates)
+        .unwrap_or_default()
+}
+
+pub fn resolve_provider_dir(runner_type: &str, cli_path_override: &str) -> Option<PathBuf> {
+    let (candidates, env_candidates, home_candidate) =
+        build_provider_dir_candidates(runner_type, cli_path_override)?;
 
     if let Some(existing) = candidates.iter().find(|candidate| candidate.exists()) {
         return Some(existing.clone());
@@ -338,4 +493,31 @@ pub fn find_cli_path(runner_type: &str, custom_path: &str) -> String {
         _ => return custom_path.to_string(),
     };
     crate::cli_detect::resolve_command_path(bin_name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn normalizes_wsl_mount_paths_to_windows_drive_keys() {
+        assert_eq!(
+            normalize_expanded_path("/mnt/d/code/OpenSource/.code-bar-worktrees-dev/session-10"),
+            "d:/code/opensource/.code-bar-worktrees-dev/session-10",
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn derives_wsl_provider_dir_from_cmd_shim() {
+        let dirs = wsl_provider_dir_candidates_from_cmd_content(
+            r#"wsl.exe -d Ubuntu-22.04 -- bash -l -c "cd '%wslpath%' && /home/zhouweibin/.npm-global/bin/codex %*""#,
+            ".codex",
+        );
+
+        assert!(dirs.contains(&PathBuf::from(
+            r"\\wsl.localhost\Ubuntu-22.04\home\zhouweibin\.codex"
+        )));
+    }
 }

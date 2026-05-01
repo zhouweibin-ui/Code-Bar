@@ -23,13 +23,9 @@ import {
 import { resetWorkbenchMode } from "../services/workbenchCommands";
 import { useSessionStore } from "../store/sessionStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
+import { buildTerminalLaunchConfig } from "./terminalLaunchConfig";
 
 const SESSION_DETAIL_ITEM_ID = "session-detail";
-
-function shellQuote(value: string) {
-  if (!value) return "''";
-  return `'${value.replace(/'/g, `'"'"'`)}'`;
-}
 
 function sanitizeSessionKey(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -182,10 +178,10 @@ function TerminalWidgetBody({ itemId }: { itemId: string }) {
     [expandedSessionId, sessions]
   );
   const terminalWorkdir = session?.worktreePath ?? session?.workdir ?? "";
-  const terminalCommand = navigator.userAgent.toLowerCase().includes("windows") ? "cmd.exe" : "sh";
-  const terminalArgs = navigator.userAgent.toLowerCase().includes("windows")
-    ? ["/K", `cd /d "${terminalWorkdir}"`]
-    : ["-lc", `cd ${shellQuote(terminalWorkdir)} && exec zsh -i`];
+  const terminalLaunch = buildTerminalLaunchConfig(
+    terminalWorkdir,
+    navigator.userAgent.toLowerCase().includes("windows")
+  );
 
   if (!widget) return null;
 
@@ -226,8 +222,8 @@ function TerminalWidgetBody({ itemId }: { itemId: string }) {
           >
             <PtyTerminal
               sessionId={ptySessionId}
-              command={terminalCommand}
-              args={terminalArgs}
+              command={terminalLaunch.command}
+              args={terminalLaunch.args}
               workdir={terminalWorkdir}
               active={isActiveTab}
             />

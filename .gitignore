@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Local agent/tool state
+.codex
+.superpowers/
+docs/superpowers/plans/
+src-tauri/tauri.existing-dev.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

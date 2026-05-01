@@ -1,5 +1,6 @@
 // ── 模块声明 ──────────────────────────────────────────────────────
 mod cli_detect;
+mod codex_history;
 mod git;
 mod hooks;
 mod i18n;

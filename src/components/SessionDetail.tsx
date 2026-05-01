@@ -8,6 +8,7 @@ import { TrafficLights } from "./TrafficLights";
 import { SessionPromptComposer } from "./session/SessionPromptComposer";
 import { SessionRunnerSurface } from "./session/SessionRunnerSurface";
 import { useSessionRunnerController } from "../hooks/useSessionRunnerController";
+import { nextMountedSessionPanelIds } from "../hooks/sessionPanelMountState";
 
 const SPRING = {
   type: "spring" as const,
@@ -443,16 +444,8 @@ export function SessionDetail({
   const [mountedIds, setMountedIds] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!visibleSessionId) return;
-    setMountedIds((prev) =>
-      prev.includes(visibleSessionId) ? prev : [...prev, visibleSessionId]
-    );
-  }, [visibleSessionId]);
-
-  useEffect(() => {
-    const sessionIds = new Set(sessions.map((s) => s.id));
-    setMountedIds((prev) => prev.filter((id) => sessionIds.has(id)));
-  }, [sessions]);
+    setMountedIds((prev) => nextMountedSessionPanelIds(prev, visibleSessionId, sessions));
+  }, [sessions, visibleSessionId]);
 
   useEffect(() => {
     if (mode !== "overlay" || !visibleSessionId) return;

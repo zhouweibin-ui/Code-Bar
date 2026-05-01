@@ -456,7 +456,9 @@ pub async fn inspect_session_delete_safety(
             let Some(base) = base else {
                 // 有 session 分支却没有 baseBranch 时，说明无法确认分支提交是否已合并。
                 // 这里不能把 ahead 当作 0，否则后续强删分支会静默丢掉已提交代码。
-                return Err(format!("缺少基础分支，无法检查分支 {branch} 是否有未合并提交"));
+                return Err(format!(
+                    "缺少基础分支，无法检查分支 {branch} 是否有未合并提交"
+                ));
             };
             let range = format!("{base}..{branch}");
             let ahead = background_command("git")

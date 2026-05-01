@@ -10,9 +10,9 @@ import {
   getRunnerBadge,
   getRunnerCliCommand,
   getRunnerInstallCommand,
-  hasNativeResumeBinding,
   switchRunnerForSession,
 } from "../services/runnerCommands";
+import { shouldAutoOpenRunnerSurface } from "./sessionRunnerState";
 
 export function useSessionRunnerController({
   sessionId,
@@ -31,7 +31,7 @@ export function useSessionRunnerController({
   const [pendingQuery, setPendingQuery] = useState("");
   const [querySent, setQuerySent] = useState(() => {
     const s = useSessionStore.getState().sessions.find((x) => x.id === sessionId);
-    return !!s && ((s.status === "running" || s.status === "waiting" || s.status === "suspended") || hasNativeResumeBinding(s));
+    return shouldAutoOpenRunnerSurface(s);
   });
   const queryInputRef = useRef<HTMLTextAreaElement>(null);
   const pendingQueryForInputRef = useRef("");
@@ -198,15 +198,14 @@ export function useSessionRunnerController({
 
   useEffect(() => {
     if (!isOpen) return;
-    const s = useSessionStore.getState().sessions.find((x) => x.id === sessionId);
-    if (hasNativeResumeBinding(s)) {
+    if (shouldAutoOpenRunnerSurface(session)) {
       setQuerySent(true);
     }
-  }, [isOpen, sessionId]);
+  }, [isOpen, session?.providerSessionId, session?.runner.type, session?.status]);
 
   useEffect(() => {
     const s = useSessionStore.getState().sessions.find((x) => x.id === sessionId);
-    setQuerySent(!!s && ((s.status === "running" || s.status === "waiting" || s.status === "suspended") || hasNativeResumeBinding(s)));
+    setQuerySent(shouldAutoOpenRunnerSurface(s));
     setPendingQuery("");
     setLaunchPrompt(null);
     setLaunchResumeSessionId(

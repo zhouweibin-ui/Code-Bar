@@ -106,22 +106,26 @@ export function SessionRunnerSurface({
         padding: isGlass ? 0 : "8px 4px 4px",
         opacity: querySent && ptyEverActive ? 1 : 0,
         pointerEvents: querySent && ptyEverActive ? "auto" : "none",
+        display: "flex",
+        flexDirection: "column",
       }}>
-        <PtyTerminal
-          sessionId={sessionId}
-          command={cliCommand}
-          args={cliBaseArgs}
-          workdir={workdir}
-          active={isOpen && querySent && ptyEverActive}
-          initialPrompt={launchPrompt}
-          supportsPromptArg={supportsPromptLaunch}
-          onReady={handlePtyReady}
-          onWaiting={handlePtyWaiting}
-          onRunning={handlePtyRunning}
-          onError={handlePtyError}
-          env={contextEnv}
-          enableWindowsCtrlCv
-        />
+        <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+          <PtyTerminal
+            sessionId={sessionId}
+            command={cliCommand}
+            args={cliBaseArgs}
+            workdir={workdir}
+            active={isOpen && querySent && ptyEverActive}
+            initialPrompt={launchPrompt}
+            supportsPromptArg={supportsPromptLaunch}
+            onReady={handlePtyReady}
+            onWaiting={handlePtyWaiting}
+            onRunning={handlePtyRunning}
+            onError={handlePtyError}
+            env={contextEnv}
+            enableWindowsCtrlCv
+          />
+        </div>
       </div>
     </>
   );
