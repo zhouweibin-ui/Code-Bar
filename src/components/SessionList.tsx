@@ -4,12 +4,23 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { AlertTriangle, Trash2 } from "lucide-react";
 import { useAppI18n } from "../i18n";
 import { ClaudeSession, SessionStatus, orderWorkspaceSessions, useSessionStore } from "../store/sessionStore";
 import { useWorkspaceStore, getWorkspaceColor } from "../store/workspaceStore";
 import { useSettingsStore, RUNNER_LABELS, sanitizeRunnerConfig, isGlassTheme } from "../store/settingsStore";
 import { useWorkbenchStore } from "../store/workbenchStore";
 import { showExplorer, showSessionSurface } from "../services/workbenchCommands";
+import {
+  buildSessionDeleteDialogState,
+  getSessionDeleteDialogMode,
+  getSessionWorkspacePath,
+  getUncommittedChangeCount,
+  type SessionDeleteDialogState,
+  type SessionDeleteSafety,
+} from "./sessionDeleteLogic";
+
+type DeleteDialogState = SessionDeleteDialogState<ClaudeSession>;
 
 // ── 状态配置（使用 CSS 变量）────────────────────────────────
 const STATUS_CONFIG: Record<SessionStatus, {
@@ -411,6 +422,215 @@ function SortableSessionCard({ id, children }: { id: string; children: ReactNode
   );
 }
 
+function DeleteSessionDialog({
+  state,
+  isGlass,
+  onCancel,
+  onConfirm,
+}: {
+  state: DeleteDialogState;
+  isGlass: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useAppI18n();
+  const { session, safety, error } = state;
+  const dialogMode = getSessionDeleteDialogMode(state);
+  const hasRisk = dialogMode === "risk";
+  const hasUncommittedChanges = safety?.hasUncommittedChanges === true;
+  const hasUnmergedCommits = safety?.hasUnmergedCommits === true;
+  const totalChanges = safety ? getUncommittedChangeCount(safety) : 0;
+  const textShadow = isGlass ? "var(--ci-glass-text-shadow)" : "none";
+  const title = dialogMode === "error"
+    ? t("session.deleteSafetyCheckTitle")
+    : hasRisk
+    ? t("session.deleteUnsafeTitle", { name: session.name })
+    : t("session.deleteConfirmTitle", { name: session.name });
+  const rows = safety ? [
+    { key: "staged", label: t("session.deleteUnsafeStaged", { count: safety.stagedCount }), value: safety.stagedCount },
+    { key: "unstaged", label: t("session.deleteUnsafeUnstaged", { count: safety.unstagedCount }), value: safety.unstagedCount },
+    { key: "untracked", label: t("session.deleteUnsafeUntracked", { count: safety.untrackedCount }), value: safety.untrackedCount },
+    { key: "conflicts", label: t("session.deleteUnsafeConflicts", { count: safety.conflictCount }), value: safety.conflictCount },
+  ].filter((row) => row.value > 0) : [];
+
+  return (
+    <div
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+        background: isGlass ? "rgba(16, 28, 42, 0.16)" : "rgba(8, 11, 18, 0.38)",
+        backdropFilter: isGlass ? "none" : "blur(18px) saturate(1.2)",
+        WebkitBackdropFilter: isGlass ? "none" : "blur(18px) saturate(1.2)",
+        textShadow,
+      }}
+    >
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("session.removeSession")}
+        initial={{ opacity: 0, scale: 0.98, y: 6 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.98, y: 6 }}
+        transition={{ duration: 0.14 }}
+        onMouseDown={(event) => event.stopPropagation()}
+        style={{
+          width: "min(420px, calc(100vw - 32px))",
+          maxHeight: "min(520px, calc(100vh - 32px))",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          borderRadius: 8,
+          background: isGlass ? "var(--ci-surface)" : "linear-gradient(180deg, var(--ci-surface-hi), var(--ci-surface))",
+          border: "1px solid var(--ci-border-med)",
+          boxShadow: "var(--ci-card-shadow-strong)",
+          color: "var(--ci-text)",
+        }}
+      >
+        <div style={{ display: "flex", gap: 10, padding: "14px 14px 10px", borderBottom: "1px solid var(--ci-border)" }}>
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "var(--ci-deleted-bg)",
+              border: "1px solid rgba(255,59,48,0.24)",
+              color: "var(--ci-red)",
+            }}
+          >
+            <AlertTriangle size={16} strokeWidth={2} />
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ci-text)", lineHeight: 1.3 }}>
+              {title}
+            </div>
+            <div style={{ marginTop: 3, fontSize: 11, color: "var(--ci-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {session.branchName ?? session.worktreePath ?? session.name}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: 14, overflow: "auto" }}>
+          {error ? (
+            <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--ci-text-muted)" }}>
+              {t("session.deleteSafetyCheckBody", { error })}
+            </div>
+          ) : !hasRisk ? (
+            <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--ci-text-muted)" }}>
+              {t("session.deleteConfirmBody")}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {hasUncommittedChanges && (
+                <div
+                  style={{
+                    padding: 10,
+                    borderRadius: 8,
+                    background: "var(--ci-btn-ghost-bg)",
+                    border: "1px solid var(--ci-border)",
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ci-text)" }}>
+                    {t("session.deleteUnsafeUncommitted", { count: totalChanges })}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 10px", marginTop: 8 }}>
+                    {rows.map((row) => (
+                      <div key={row.key} style={{ fontSize: 11, color: "var(--ci-text-muted)" }}>
+                        {row.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {hasUnmergedCommits && safety && (
+                <div
+                  style={{
+                    padding: 10,
+                    borderRadius: 8,
+                    background: "var(--ci-accent-bg)",
+                    border: "1px solid var(--ci-accent-bdr)",
+                    color: "var(--ci-accent)",
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  {t("session.deleteUnsafeUnmerged", { count: safety.aheadCount })}
+                </div>
+              )}
+
+              <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--ci-text-muted)" }}>
+                {t("session.deleteUnsafeConfirm")}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+            padding: 12,
+            borderTop: "1px solid var(--ci-border)",
+            background: "var(--ci-surface)",
+          }}
+        >
+          <button
+            onClick={onCancel}
+            style={{
+              minWidth: 76,
+              height: 30,
+              borderRadius: 7,
+              border: "1px solid var(--ci-border)",
+              background: "var(--ci-btn-ghost-bg)",
+              color: "var(--ci-text-muted)",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            {t("common.cancel")}
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              minWidth: 96,
+              height: 30,
+              borderRadius: 7,
+              border: "1px solid rgba(255,59,48,0.32)",
+              background: "var(--ci-deleted-bg)",
+              color: "var(--ci-red)",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 700,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+            }}
+          >
+            <Trash2 size={13} strokeWidth={2} />
+            {t("session.confirmDelete")}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ── 主组件：SessionList ───────────────────────────────────────
 export function SessionList() {
   const { t } = useAppI18n();
@@ -437,6 +657,7 @@ export function SessionList() {
   const settings = useSettingsStore((s) => s.settings);
   const isGlass = isGlassTheme(settings.theme);
   const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<string | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState | null>(null);
   const textShadow = isGlass ? "var(--ci-glass-text-shadow)" : "none";
 
   const accentColor = activeWorkspace ? getWorkspaceColor(activeWorkspace.color) : "var(--ci-accent)";
@@ -541,8 +762,10 @@ export function SessionList() {
     markWorktreeReady(id);
   };
 
-  const handleRemoveSession = async (session: ClaudeSession) => {
-    setPendingDeleteSessionId(null);
+  const removeSessionAndWorktree = async (session: ClaudeSession) => {
+    const workspacePath = getSessionWorkspacePath(session, workspaces);
+    const shouldCloseWorkbench = useWorkbenchStore.getState().focusedSessionId === session.id
+      || useSessionStore.getState().expandedSessionId === session.id;
 
     if ("__TAURI_INTERNALS__" in window) {
       await invoke("mark_deleted_items", {
@@ -561,8 +784,10 @@ export function SessionList() {
     }
 
     removeSession(session.id);
+    if (shouldCloseWorkbench) {
+      useWorkbenchStore.getState().resetWorkbenchMode();
+    }
 
-    const workspacePath = activeWorkspace?.path;
     if (!("__TAURI_INTERNALS__" in window) || !workspacePath || !session.worktreePath || !session.branchName) {
       return;
     }
@@ -574,6 +799,36 @@ export function SessionList() {
     }).catch((e) => {
       console.warn("[worktree] teardown failed:", e);
     });
+  };
+
+  const handleRemoveSession = async (session: ClaudeSession) => {
+    setPendingDeleteSessionId(null);
+
+    const workspacePath = getSessionWorkspacePath(session, workspaces);
+    const canInspectWorktree = "__TAURI_INTERNALS__" in window
+      && !!workspacePath
+      && !!session.worktreePath
+      && !!session.branchName;
+
+    if (canInspectWorktree) {
+      try {
+        const safety = await invoke<SessionDeleteSafety>("inspect_session_delete_safety", {
+          workdir: workspacePath,
+          worktreePath: session.worktreePath,
+          branch: session.branchName,
+          baseBranch: session.baseBranch ?? null,
+        });
+
+        setDeleteDialog(buildSessionDeleteDialogState(session, { safety }));
+        return;
+      } catch (e) {
+        const error = e instanceof Error ? e.message : String(e);
+        setDeleteDialog(buildSessionDeleteDialogState(session, { error }));
+        return;
+      }
+    }
+
+    setDeleteDialog(buildSessionDeleteDialogState(session));
   };
 
   if (!activeWorkspace) return null;
@@ -690,6 +945,21 @@ export function SessionList() {
           {t("session.emptyList")}
         </div>
       )}
+
+      <AnimatePresence>
+        {deleteDialog && (
+          <DeleteSessionDialog
+            state={deleteDialog}
+            isGlass={isGlass}
+            onCancel={() => setDeleteDialog(null)}
+            onConfirm={() => {
+              const session = deleteDialog.session;
+              setDeleteDialog(null);
+              void removeSessionAndWorktree(session);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

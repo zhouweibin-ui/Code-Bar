@@ -227,6 +227,7 @@ pub fn run() {
             git::worktree::git_worktree_merge,
             git::worktree::setup_session_worktree,
             git::worktree::teardown_session_worktree,
+            git::worktree::inspect_session_delete_safety,
             git::worktree::prune_orphan_worktrees,
             // PTY 终端
             pty::start_pty_session,

@@ -1,4 +1,10 @@
-use std::{fs, path::Path, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    fs,
+    path::Path,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+use serde::Serialize;
 
 use crate::runtime_scope::session_worktree_root_dir;
 use crate::util::{background_command, expand_path, normalize_expanded_path};
@@ -16,6 +22,88 @@ pub fn session_branch_prefix() -> String {
 
 pub fn session_branch_name(prefix: &str, session_id: &str) -> String {
     format!("{prefix}/session-{session_id}")
+}
+
+#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionDeleteStatusCounts {
+    staged_count: usize,
+    unstaged_count: usize,
+    untracked_count: usize,
+    conflict_count: usize,
+}
+
+impl SessionDeleteStatusCounts {
+    fn has_uncommitted_changes(&self) -> bool {
+        self.staged_count > 0
+            || self.unstaged_count > 0
+            || self.untracked_count > 0
+            || self.conflict_count > 0
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionDeleteSafety {
+    staged_count: usize,
+    unstaged_count: usize,
+    untracked_count: usize,
+    conflict_count: usize,
+    ahead_count: usize,
+    has_uncommitted_changes: bool,
+    has_unmerged_commits: bool,
+}
+
+fn parse_session_delete_status_counts(status_output: &str) -> SessionDeleteStatusCounts {
+    let mut counts = SessionDeleteStatusCounts::default();
+
+    for line in status_output.lines() {
+        if line.len() < 3 {
+            continue;
+        }
+
+        let chars = line.chars().collect::<Vec<_>>();
+        let x = chars[0];
+        let y = chars[1];
+        let conflicted = matches!(
+            (x, y),
+            ('D', 'D')
+                | ('A', 'U')
+                | ('U', 'D')
+                | ('U', 'A')
+                | ('D', 'U')
+                | ('A', 'A')
+                | ('U', 'U')
+        ) || x == 'U'
+            || y == 'U';
+        let untracked = x == '?' && y == '?';
+        let staged = !conflicted && !untracked && x != ' ';
+        let unstaged = !conflicted && !untracked && y != ' ';
+
+        if conflicted {
+            counts.conflict_count += 1;
+            continue;
+        }
+        if untracked {
+            counts.untracked_count += 1;
+            continue;
+        }
+        if staged {
+            counts.staged_count += 1;
+        }
+        if unstaged {
+            counts.unstaged_count += 1;
+        }
+    }
+
+    counts
+}
+
+fn parse_rev_count(output: &[u8]) -> usize {
+    String::from_utf8_lossy(output)
+        .trim()
+        .parse::<usize>()
+        .unwrap_or(0)
 }
 
 /// 从 worktree 目录的 HEAD 文件读取分支名
@@ -315,6 +403,74 @@ pub async fn teardown_session_worktree(
     .map_err(|e| e.to_string())?
 }
 
+/// 检查删除 session 是否会丢失未提交改动或未合并提交。
+#[tauri::command]
+pub async fn inspect_session_delete_safety(
+    workdir: String,
+    worktree_path: String,
+    branch: String,
+    base_branch: Option<String>,
+) -> Result<SessionDeleteSafety, String> {
+    let expanded_workdir = expand_path(&workdir);
+    let expanded_wt = expand_path(&worktree_path);
+
+    tokio::task::spawn_blocking(move || {
+        let status = background_command("git")
+            .current_dir(&expanded_wt)
+            .args(["status", "--porcelain=v1"])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        if !status.status.success() {
+            return Err(String::from_utf8_lossy(&status.stderr).trim().to_string());
+        }
+
+        let counts = parse_session_delete_status_counts(&String::from_utf8_lossy(&status.stdout));
+        let branch = branch.trim().to_string();
+        let base = base_branch
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let ahead_count = if branch.is_empty() {
+            0
+        } else {
+            let Some(base) = base else {
+                // 有 session 分支却没有 baseBranch 时，说明无法确认分支提交是否已合并。
+                // 这里不能把 ahead 当作 0，否则后续强删分支会静默丢掉已提交代码。
+                return Err(format!("缺少基础分支，无法检查分支 {branch} 是否有未合并提交"));
+            };
+            let range = format!("{base}..{branch}");
+            let ahead = background_command("git")
+                .current_dir(&expanded_workdir)
+                .args(["rev-list", "--count", &range])
+                .output()
+                .map_err(|e| e.to_string())?;
+
+            if !ahead.status.success() {
+                return Err(format!(
+                    "检查未合并提交失败: {}",
+                    String::from_utf8_lossy(&ahead.stderr).trim()
+                ));
+            }
+
+            parse_rev_count(&ahead.stdout)
+        };
+
+        Ok(SessionDeleteSafety {
+            staged_count: counts.staged_count,
+            unstaged_count: counts.unstaged_count,
+            untracked_count: counts.untracked_count,
+            conflict_count: counts.conflict_count,
+            ahead_count,
+            has_uncommitted_changes: counts.has_uncommitted_changes(),
+            has_unmerged_commits: ahead_count > 0,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// 清理孤儿 worktree：删除不在 known_worktree_paths 中的所有 worktree 目录和分支
 #[tauri::command]
 pub async fn prune_orphan_worktrees(
@@ -389,4 +545,100 @@ pub async fn prune_orphan_worktrees(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn test_path(name: &str) -> PathBuf {
+        let millis = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .ok()
+            .map(|duration| duration.as_millis())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!("code-bar-{name}-{millis}"))
+    }
+
+    fn git_status(workdir: &Path, args: &[&str]) -> std::process::ExitStatus {
+        background_command("git")
+            .current_dir(workdir)
+            .args(args)
+            .status()
+            .unwrap_or_else(|e| panic!("git {:?} failed to start: {e}", args))
+    }
+
+    fn assert_git(workdir: &Path, args: &[&str]) {
+        let status = git_status(workdir, args);
+        assert!(status.success(), "git {:?} failed with {status}", args);
+    }
+
+    #[test]
+    fn parses_delete_safety_status_counts() {
+        let counts = parse_session_delete_status_counts(concat!(
+            " M src/App.tsx\n",
+            " D src/deleted.ts\n",
+            "A  src/new-file.ts\n",
+            "?? scratch.md\n",
+            "UU conflicted.txt\n",
+        ));
+
+        assert_eq!(counts.unstaged_count, 2);
+        assert_eq!(counts.staged_count, 1);
+        assert_eq!(counts.untracked_count, 1);
+        assert_eq!(counts.conflict_count, 1);
+        assert!(counts.has_uncommitted_changes());
+    }
+
+    #[test]
+    fn delete_safety_errors_when_session_branch_has_no_base_branch() {
+        let root = test_path("missing-base-branch");
+        let repo = root.join("repo");
+        let worktree = root.join("session-worktree");
+        fs::create_dir_all(&repo).unwrap();
+
+        if !git_status(&repo, &["init", "-b", "main"]).success() {
+            assert_git(&repo, &["init"]);
+            assert_git(&repo, &["checkout", "-b", "main"]);
+        }
+        assert_git(&repo, &["config", "user.email", "code-bar@example.test"]);
+        assert_git(&repo, &["config", "user.name", "Code Bar Test"]);
+        fs::write(repo.join("README.md"), "base\n").unwrap();
+        assert_git(&repo, &["add", "README.md"]);
+        assert_git(&repo, &["commit", "-m", "base"]);
+        assert_git(
+            &repo,
+            &[
+                "worktree",
+                "add",
+                "-b",
+                "ci/test/session-1",
+                worktree.to_str().unwrap(),
+                "HEAD",
+            ],
+        );
+
+        fs::write(worktree.join("session.txt"), "session\n").unwrap();
+        assert_git(&worktree, &["add", "session.txt"]);
+        assert_git(&worktree, &["commit", "-m", "session"]);
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = runtime.block_on(inspect_session_delete_safety(
+            repo.to_string_lossy().to_string(),
+            worktree.to_string_lossy().to_string(),
+            "ci/test/session-1".to_string(),
+            None,
+        ));
+
+        assert!(
+            result.is_err(),
+            "缺少 baseBranch 时不能把已提交但未合并的分支当作安全删除"
+        );
+
+        let _ = fs::remove_dir_all(root);
+    }
 }
